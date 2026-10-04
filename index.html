@@ -719,22 +719,27 @@ const BASE_CATALOG = [
   return {id:"p"+i, name:r[0], cat:r[1], size:r[2], price:r[3], desc:r[4]||""};
 });
 
+/* These defaults ship inside the file, so every customer who opens the page
+   sees them. Owner-tools edits are saved per-browser and only change what
+   THAT device shows — bump `v` whenever these defaults change so saved
+   settings pick up the new values. */
 const DEFAULT_SETTINGS = {
-  storeName:"Triad Beauty Supply",
+  v:2,
+  storeName:"Greensboro Haircare",
   tagline:"Influance pro line · Greensboro delivery",
   about:"We carry the full Influance professional line and deliver across Greensboro and the Triad. Place your order by 6 PM and it arrives the next day.",
-  phone:"",
+  phone:"336-314-5959",
   email:"",
   taxRate:6.75,
   taxLabel:"NC sales tax (Guilford County)",
   deliveryFee:0,
   freeOver:0,
   minOrder:0,
-  cashapp:"",
-  zelle:"",
+  cashapp:"$WilbertArtis",
+  zelle:"336-314-5959",
+  applepay:"336-314-5959",
   paypal:"",
   venmo:"",
-  acceptApplePay:true,
   acceptCash:true,
   adminPin:"1234"
 };
@@ -758,12 +763,12 @@ function digitsOf(v){ return String(v||"").replace(/[^\d]/g,""); }
         Copy the part after /f/  (here: abcdwxyz)
      4. Paste it below as FORMSPREE_ID.
 
-   WANT A TEXT MESSAGE TOO?
+   WANT A TEXT TO 336-314-5959 TOO?
      In Formspree, add a second recipient using your carrier's
-     email-to-text gateway for your own number:
-        Verizon    5551234567@vtext.com
-        AT&T       5551234567@txt.att.net
-        T-Mobile   5551234567@tmomail.net
+     email-to-text gateway for that number:
+        Verizon    3363145959@vtext.com
+        AT&T       3363145959@txt.att.net
+        T-Mobile   3363145959@tmomail.net
    ============================================================ */
 const FORMSPREE_ID = "";          // e.g. "abcdwxyz"  — leave "" to disable
 const ALERTS_ENABLED = true;      // set false to turn alerts off entirely
@@ -792,8 +797,24 @@ async function sendOrderAlert(o){
 
 /* ---------------- state ---------------- */
 const LS_SET="tbs_settings_v1", LS_CAT="tbs_catalog_v1", LS_CART="tbs_cart_v1";
-let settings = loadJSON(LS_SET, DEFAULT_SETTINGS);
-settings = Object.assign({}, DEFAULT_SETTINGS, settings);
+/* Merge saved settings over the shipped defaults.
+   If the save predates the current defaults (different `v`), a blank saved
+   field must NOT wipe out a real new default — otherwise someone who saved
+   settings before payment handles existed would silently lose them. */
+function mergeSettings(stored){
+  const out = Object.assign({}, DEFAULT_SETTINGS);
+  if(!stored || typeof stored !== "object") return out;
+  const sameVersion = stored.v === DEFAULT_SETTINGS.v;
+  Object.keys(stored).forEach(function(k){
+    const val = stored[k];
+    if(val === undefined || val === null) return;
+    if(!sameVersion && val === "" && DEFAULT_SETTINGS[k]) return; // keep the new default
+    out[k] = val;
+  });
+  out.v = DEFAULT_SETTINGS.v;
+  return out;
+}
+let settings = mergeSettings(loadJSON(LS_SET, null));
 let catalog  = loadJSON(LS_CAT, null) || BASE_CATALOG.slice();
 let cart     = loadJSON(LS_CART, {});
 let activeCat = "All";
@@ -942,10 +963,10 @@ function payOptions(){
     desc:"Tap one button on your receipt and Venmo opens with the exact amount already filled in."});
   if(settings.paypal) opts.push({id:"paypal", label:"PayPal", when:"now", handle:settings.paypal,
     desc:"Tap one button on your receipt and PayPal opens with the exact amount already filled in."});
+  if(settings.applepay) opts.push({id:"applepay", label:"Apple Pay", when:"now", handle:settings.applepay,
+    desc:"Send through Apple Cash in Messages to "+settings.applepay+", or just tap your phone to ours at the door."});
   if(settings.zelle) opts.push({id:"zelle", label:"Zelle", when:"now", handle:settings.zelle,
     desc:"Send to "+settings.zelle+" from your bank app. We'll confirm it before we load the van."});
-  if(settings.acceptApplePay) opts.push({id:"applepay", label:"Apple Pay at the door", when:"later",
-    desc:"Tap your phone to ours when we hand off the order tomorrow."});
   if(settings.acceptCash) opts.push({id:"cash", label:"Cash or card on delivery", when:"later",
     desc:"Pay the driver when your order arrives. Exact change appreciated but not required."});
   if(!opts.length) opts.push({id:"cash", label:"Pay on delivery", when:"later", desc:"Pay when your order arrives."});
@@ -960,7 +981,18 @@ function payLink(o){
   if(o.pay.id==="cashapp" && settings.cashapp) return "https://cash.app/$"+handleOf(settings.cashapp)+"/"+amt;
   if(o.pay.id==="venmo"   && settings.venmo)   return "https://venmo.com/"+handleOf(settings.venmo)+"?txn=pay&amount="+amt+"&note="+note;
   if(o.pay.id==="paypal"  && settings.paypal)  return "https://paypal.me/"+handleOf(settings.paypal)+"/"+amt+"USD";
+  // Apple Cash is sent inside Messages, so open a thread to the number.
+  if(o.pay.id==="applepay" && settings.applepay)
+    return "sms:"+digitsOf(settings.applepay)+"?&body="+encodeURIComponent(
+      settings.storeName+" order "+o.code+" — sending "+money(o.totals.total));
   return null;
+}
+
+/* Wording for the one-tap pay button, per method. */
+function payButtonLabel(o){
+  const amt = money(o.totals.total);
+  if(o.pay.id==="applepay") return "Open Messages to send "+amt;
+  return "Open "+o.pay.label+" and pay "+amt;
 }
 
 function renderPayList(){
@@ -1024,9 +1056,15 @@ function receiptHTML(o){
 
   let pay="";
   const link = payLink(o);
-  if(link){
+  if(link && o.pay.id==="applepay"){
+    pay = '<div class="payinstr"><h4>Pay your '+money(o.totals.total)+' with Apple Pay</h4>'+
+      '<a class="btn" href="'+esc(link)+'" style="margin:4px 0 10px">'+esc(payButtonLabel(o))+'</a>'+
+      '<p style="font-size:13px;color:var(--text-2)">That opens a message to <span class="handle">'+esc(o.pay.handle)+'</span>. Tap the Apple Pay button in Messages, enter <b>'+money(o.totals.total)+'</b>, and send.</p>'+
+      '<p><b>Or just pay at the door</b> — tap your phone to ours when we drop the order off. Either way works.</p>'+
+      '<p style="font-size:13px;color:var(--text-2)">If you send it now, please mention <b>'+esc(o.code)+'</b> so we can match it to your order.</p></div>';
+  } else if(link){
     pay = '<div class="payinstr"><h4>Pay your '+money(o.totals.total)+'</h4>'+
-      '<a class="btn" href="'+esc(link)+'" target="_blank" rel="noopener" style="margin:4px 0 10px">Open '+esc(o.pay.label)+' and pay '+money(o.totals.total)+'</a>'+
+      '<a class="btn" href="'+esc(link)+'" target="_blank" rel="noopener" style="margin:4px 0 10px">'+esc(payButtonLabel(o))+'</a>'+
       '<p style="font-size:13px;color:var(--text-2)">That button opens '+esc(o.pay.label)+' with the amount already filled in. If it doesn\'t open, send <b>'+money(o.totals.total)+'</b> manually to <span class="handle">'+esc(o.pay.handle)+'</span></p>'+
       '<p>Please put <b>'+esc(o.code)+'</b> in the payment note so we can match it to your order. We\'ll text you once it lands.</p>'+
       '<p style="font-size:13px;color:var(--text-2)">Changed your mind? You can pay at the door instead — just say so when we text.</p></div>';
@@ -1360,17 +1398,17 @@ function renderAdmin(tab){
   }
 
   if(tab==="payments"){
-    h += '<div class="note" style="margin-bottom:14px"><b>Cash App, Venmo and PayPal get a one-tap button.</b> The customer\'s receipt opens the app with the exact total already filled in. Zelle has no link of its own, so it shows your handle instead. Leave any field blank and it disappears from checkout.</div>'+
+    h += '<div class="note" style="margin-bottom:14px"><b>Cash App, Venmo and PayPal get a one-tap button</b> that opens the app with the exact total filled in. <b>Apple Pay</b> opens a message to your number so they can send Apple Cash, and still works at the door. <b>Zelle</b> has no link of its own, so it shows your number instead. Leave any field blank and it disappears from checkout.</div>'+
       '<div class="two">'+
       afield("sCashapp","Cash App $cashtag",s.cashapp)+
-      afield("sVenmo","Venmo username",s.venmo)+'</div>'+
+      afield("sApplepay","Apple Pay phone number",s.applepay)+'</div>'+
       '<div class="two">'+
-      afield("sPaypal","PayPal.me username",s.paypal)+
-      afield("sZelle","Zelle email or phone",s.zelle)+'</div>'+
-      '<label class="checkline" for="sApple" style="margin-bottom:10px"><input type="checkbox" id="sApple"'+(s.acceptApplePay?" checked":"")+'>'+
-      '<span><b>Offer Apple Pay at the door</b><span>They tap their phone to yours when you deliver. Needs a card reader or Tap to Pay on your phone.</span></span></label>'+
+      afield("sZelle","Zelle email or phone",s.zelle)+
+      afield("sVenmo","Venmo username (optional)",s.venmo)+'</div>'+
+      afield("sPaypal","PayPal.me username (optional)",s.paypal)+
       '<label class="checkline" for="sCash"><input type="checkbox" id="sCash"'+(s.acceptCash?" checked":"")+'>'+
-      '<span><b>Offer cash or card on delivery</b><span>The simplest option — they pay you at hand-off.</span></span></label>';
+      '<span><b>Offer cash or card on delivery</b><span>The simplest option — they pay you at hand-off.</span></span></label>'+
+      '<div class="note" style="margin-top:14px;border-left-color:var(--warn);background:var(--warn-soft)"><b>Heads up:</b> what you change here is saved in <b>this browser only</b> — your customers still see the handles built into the file. The ones above are already built in, so there\'s nothing you need to do. If you change them here and want customers to see the change, send me the new details and I\'ll bake them into a fresh file.</div>';
   }
 
   if(tab==="products"){
@@ -1436,7 +1474,7 @@ function collectAdmin(){
     settings.venmo=v("sVenmo")||"";
     settings.paypal=v("sPaypal")||"";
     settings.zelle=v("sZelle")||"";
-    settings.acceptApplePay=$("sApple")?$("sApple").checked:true;
+    settings.applepay=v("sApplepay")||"";
     settings.acceptCash=$("sCash")?$("sCash").checked:true;
   }
   if(tab==="products"){
