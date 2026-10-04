@@ -873,7 +873,7 @@ const BASE_CATALOG = [
    THAT device shows — bump `v` whenever these defaults change so saved
    settings pick up the new values. */
 const DEFAULT_SETTINGS = {
-  v:3,
+  v:4,
   storeName:"Greensboro Haircare",
   tagline:"Influance pro line · Greensboro delivery",
   about:"We carry the full Influance professional line and deliver across Greensboro and the Triad. Place your order by 6 PM and it arrives the next day.",
@@ -891,6 +891,10 @@ const DEFAULT_SETTINGS = {
   venmo:"",
   acceptCash:true,
   adminPin:"Artis",
+
+  /* The catalogs are built into this file. Turn this on only if you ALSO
+     upload the /catalogs folder and want a full-resolution PDF download. */
+  catalogPdfs:false,
 
   /* Discount codes. type "pct" = percent off, "amt" = dollars off.
      `min` is the subtotal a customer must reach to use it (0 = any order).
@@ -1682,7 +1686,7 @@ function openCatalog(id){
   // Probe for the full-resolution PDF; show the link only if it's really there.
   const dl = $("dlCat");
   dl.hidden = true;
-  if(meta.file && typeof window.claude === "undefined"){
+  if(settings.catalogPdfs && meta.file && typeof window.claude === "undefined"){
     fetch(meta.file, {method:"HEAD"}).then(function(r){
       if(r.ok){ dl.href = meta.file; dl.hidden = false; }
     }).catch(function(){ /* not published alongside — viewer still works */ });
@@ -1974,7 +1978,10 @@ function renderAdmin(tab){
       afield("sFree","Free delivery over ($, 0 = always free)",s.freeOver,"number")+'</div>'+
       '<div class="two">'+
       afield("sMin","Minimum order ($, 0 = none)",s.minOrder,"number")+
-      afield("sPin","Owner PIN for this panel",s.adminPin)+'</div>';
+      afield("sPin","Owner password for this panel",s.adminPin)+'</div>'+
+      '<label class="checkline" for="sPdfs"><input type="checkbox" id="sPdfs"'+(s.catalogPdfs?" checked":"")+'>'+
+      '<span><b>I also uploaded the /catalogs folder</b><span>Leave this off unless you put that folder on your site too. '+
+      'The catalogs already work without it \u2014 switching this on just adds a full-resolution PDF download button in the viewer.</span></span></label>';
   }
 
   if(tab==="payments"){
@@ -2089,7 +2096,8 @@ function collectAdmin(){
     settings.deliveryFee=Number(v("sDel"))||0;
     settings.freeOver=Number(v("sFree"))||0;
     settings.minOrder=Number(v("sMin"))||0;
-    settings.adminPin=v("sPin")||"1234";
+    settings.adminPin=v("sPin")||"Artis";
+    settings.catalogPdfs=$("sPdfs")?$("sPdfs").checked:false;
   }
   if(tab==="payments"){
     settings.cashapp=v("sCashapp")||"";

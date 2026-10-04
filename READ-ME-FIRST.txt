@@ -1,0 +1,29 @@
+GREENSBORO HAIRCARE — what to upload
+====================================
+
+WHAT WENT WRONG
+Your site has the catalogs folder from an earlier download, which contains
+5 PDFs. The Guest Consultation Form was added later, so its PDF
+(consultation-form.pdf) was never in that folder — the app looked for it,
+didn't find it, and that's the error you saw. My fault, not yours.
+
+THE EASY FIX — upload index.html only
+-------------------------------------
+Replace index.html in your repo with the one in this folder. Done.
+All six sheets, consultation form included, are built INTO that file. They
+open and print with no folder at all. You can even delete the catalogs
+folder from your repo and everything keeps working.
+
+IF YOU WANT PDF DOWNLOAD BUTTONS TOO (optional)
+-----------------------------------------------
+1. Upload index.html AND the whole catalogs folder from here (6 PDFs now —
+   consultation-form.pdf is the one that was missing).
+2. On your site, tap the gear, password Artis.
+3. Store & tax tab -> tick "I also uploaded the /catalogs folder".
+4. Save.
+
+Now each sheet also shows "Download the PDF" for the full-resolution file.
+Leave that box unticked and nothing breaks — the built-in viewer still works.
+
+AFTER UPLOADING
+Hard-refresh: Ctrl+Shift+R on Windows, Cmd+Shift+R on Mac.
