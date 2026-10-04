@@ -86,6 +86,9 @@
 }
 
 *{box-sizing:border-box}
+/* `display:flex` on .btn beats the browser's default [hidden] rule, which
+   would leave hidden buttons visible when this file is hosted on its own. */
+[hidden]{display:none !important}
 body{
   margin:0; background:var(--paper); color:var(--text);
   font-family:"Source Sans 3", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -312,6 +315,8 @@ footer b{color:var(--text-2)}
 .sendrow{display:flex; gap:9px}
 .sendrow .btn{flex:1; padding:12px 10px; font-size:14.5px}
 @media (max-width:420px){ .sendrow{flex-direction:column} }
+.sendpick{display:flex; flex-direction:column; gap:10px; margin-top:16px}
+.sendpick .note{margin:0}
 .sendbox.sent{background:var(--good-soft); border-color:var(--good)}
 .sendbox.sent h4{color:var(--good)}
 /* payment step */
@@ -537,6 +542,18 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
   </div>
 </div>
 
+<!-- SEND ORDER -->
+<div class="sheet" id="sendSheet" role="dialog" aria-modal="true" aria-labelledby="sendTitle">
+  <div class="sheet-head">
+    <h2 id="sendTitle">Send us your order</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="sheet-body" id="sendBody"></div>
+  <div class="sheet-foot">
+    <button class="btn" id="toReceipt">Continue to my receipt</button>
+  </div>
+</div>
+
 <!-- RECEIPT -->
 <div class="sheet" id="rcSheet" role="dialog" aria-modal="true" aria-labelledby="rcTitle">
   <div class="sheet-head">
@@ -545,9 +562,9 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
   </div>
   <div class="sheet-body" id="rcBody"></div>
   <div class="sheet-foot noprint">
-    <a class="btn" id="emailOrder" href="#">Send this order to us by email</a>
-    <button class="btn ghost" id="printRcpt">Print or save as PDF</button>
+    <button class="btn" id="printRcpt">Print or save as PDF</button>
     <button class="btn ghost" id="downloadRcpt" hidden>Download receipt</button>
+    <a class="btn ghost" id="emailOrder" href="#">Email us this order again</a>
     <button class="btn ghost" data-close>Done</button>
   </div>
 </div>
@@ -1140,15 +1157,6 @@ function receiptHTML(o){
         (o.exempt?'<dt>Resale cert.</dt><dd>'+esc(o.exemptNum)+'</dd>':'')+
         '<dt>Ordered</dt><dd>'+d+' at '+tm+'</dd>'+
       '</dl>'+
-      '<div class="sendbox" id="sendBox">'+
-        '<h4>One last step — send it to us</h4>'+
-        '<p>Tap either button and your order details are already written out. Just hit send.</p>'+
-        '<div class="sendrow">'+
-          (settings.phone? '<a class="btn" id="smsOrder" href="#">Text us this order</a>' : '')+
-          '<a class="btn '+(settings.phone?'ghost':'')+'" id="emailOrderInline" href="#">Email us this order</a>'+
-        '</div>'+
-        '<button class="btn ghost" id="copyOrder" style="margin-top:9px">Copy order details</button>'+
-      '</div>'+
       '<div class="note" style="margin-top:18px"><b>What happens next:</b> we confirm your order by text or call, then deliver on '+tomorrow+'. If anything is out of stock we tell you before we charge or deliver anything — we never substitute without asking.</div>'+
       '<p style="font-size:13px;color:var(--text-3);margin:16px 0 0">Questions about this order? '+
         (settings.phone? 'Call or text '+esc(settings.phone)+'.' : 'Reply to the confirmation text.')+
@@ -1339,46 +1347,84 @@ function renderPaySheet(o){
     : "Submit my order";
 }
 
-/* Fire the "order placed" alert and reflect the result in the receipt.
-   The receipt is already on screen, so this never blocks the customer. */
+/* ---------- send step (between payment and confirmation) ---------- */
+/* Renders the "how do you want to send this" screen. `state` is
+   "sending" | "auto" (went automatically) | "manual" (customer sends it). */
+function renderSendSheet(o, state){
+  const hasEmail = !!settings.email;
+  const hasPhone = !!settings.phone;
+
+  if(state === "sending"){
+    $("sendBody").innerHTML =
+      '<div class="sendbox"><h4>Sending your order\u2026</h4>'+
+      '<p>One second while we pass this to the shop.</p></div>';
+    $("toReceipt").textContent = "Continue to my receipt";
+    return;
+  }
+
+  if(state === "auto"){
+    $("sendBody").innerHTML =
+      '<div class="sendbox sent"><h4>\u2713 Sent \u2014 the shop has your order</h4>'+
+      '<p>It landed in their inbox just now, so there\u2019s nothing else you need to do. '+
+      'You\u2019ll get a text or call to confirm before delivery.</p></div>'+
+      (hasPhone || hasEmail ?
+        '<p class="dim" style="margin-top:16px;text-align:center">Want to send a copy yourself as well?</p>'+
+        '<div class="sendrow" style="margin-top:10px">'+
+          (hasPhone ? '<a class="btn ghost" id="smsOrder" href="#">Text a copy</a>' : '')+
+          (hasEmail ? '<a class="btn ghost" id="emailOrderInline" href="#">Email a copy</a>' : '')+
+        '</div>' : '');
+    $("toReceipt").textContent = "Continue to my receipt";
+    return;
+  }
+
+  // manual — the customer picks how to send it
+  $("sendBody").innerHTML =
+    '<div class="sendbox"><h4>Last step \u2014 send it to the shop</h4>'+
+    '<p>Pick text or email and your full order is already written out for you. '+
+    'All you do is hit send.</p></div>'+
+    '<div class="sendpick">'+
+      (hasPhone ? '<a class="btn" id="smsOrder" href="#">Send by text message</a>' : '')+
+      (hasEmail ? '<a class="btn '+(hasPhone?'ghost':'')+'" id="emailOrderInline" href="#">Send by email</a>' : '')+
+      (!hasPhone && !hasEmail ?
+        '<div class="note">The shop hasn\u2019t set a phone number or email yet. Use <b>Copy order details</b> below and send it to them however you normally would.</div>' : '')+
+      '<button class="btn ghost" id="copyOrder">Copy order details</button>'+
+    '</div>'+
+    '<p class="dim" style="margin-top:16px;text-align:center">Already sent it? Just tap continue below.</p>';
+  $("toReceipt").textContent = "I've sent it \u2014 show my receipt";
+}
+
+/* Try the automatic alert, then show the right version of the send step. */
 function runOrderAlert(o){
   const id = FORMSPREE_ID || settings.formspreeId || "";
-  if(!id) return;                       // not configured — manual buttons stand
-  const box = $("sendBox");
-  if(box){
-    box.innerHTML = '<h4>Sending your order…</h4>'+
-      '<p>One second while we pass this to the shop.</p>';
+  if(!id){
+    renderSendSheet(o, "manual");
+    wireReceiptLinks(o);
+    return;
   }
+  renderSendSheet(o, "sending");
   sendOrderAlert(o, "NEW ORDER").then(function(sent){
-    const b = $("sendBox");
-    if(!b) return;
-    if(sent){
-      b.className = "sendbox sent";
-      b.innerHTML = '<h4>✓ We’ve got your order</h4>'+
-        '<p>It landed in the shop’s inbox just now — nothing else for you to do. '+
-        'You’ll get a text or call to confirm before delivery.</p>';
-    }else{
-      b.innerHTML = '<h4>One last step — send it to us</h4>'+
-        '<p>Our automatic alert didn’t go through, so please tap a button below. '+
-        'Your order details are already written out — just hit send.</p>'+
-        '<div class="sendrow">'+
-          (settings.phone? '<a class="btn" id="smsOrder" href="#">Text us this order</a>' : '')+
-          '<a class="btn '+(settings.phone?'ghost':'')+'" id="emailOrderInline" href="#">Email us this order</a>'+
-        '</div>'+
-        '<button class="btn ghost" id="copyOrder" style="margin-top:9px">Copy order details</button>';
-      wireReceiptLinks(o);
-    }
+    renderSendSheet(o, sent ? "auto" : "manual");
+    wireReceiptLinks(o);
+  }).catch(function(){
+    renderSendSheet(o, "manual");
+    wireReceiptLinks(o);
   });
 }
 
-/* Build the text / email / copy handoffs for a placed order. */
+/* Build the text / email / copy handoffs for a placed order.
+   Safe to call more than once: hrefs refresh, listeners bind only once. */
 function wireReceiptLinks(o){
   const text = receiptText(o);
   const subj = encodeURIComponent("New order "+o.code+" — "+o.name+(o.shop?" ("+o.shop+")":""));
   const body = encodeURIComponent(text);
   const mailto = "mailto:"+(settings.email||"")+"?subject="+subj+"&body="+body;
+  const once = function(el){ if(!el || el.dataset.bound) return false; el.dataset.bound="1"; return true; };
 
-  $("emailOrder").href = mailto;
+  const footEmail = $("emailOrder");
+  if(footEmail){
+    footEmail.href = mailto;
+    footEmail.hidden = !settings.email;   // nowhere to send it without an address
+  }
   const inlineEmail = $("emailOrderInline");
   if(inlineEmail) inlineEmail.href = mailto;
 
@@ -1390,17 +1436,17 @@ function wireReceiptLinks(o){
       "Total "+money(o.totals.total)+" · "+o.pay.label+"\n"+
       o.addr.replace(/\n/g,", ")+"\n\n"+text
     );
-    sms.addEventListener("click", function(){
+    if(once(sms)) sms.addEventListener("click", function(){
       setTimeout(()=>toast("Your texting app should be opening — just hit send."), 400);
     });
   }
 
-  if(inlineEmail) inlineEmail.addEventListener("click", function(){
+  if(once(inlineEmail)) inlineEmail.addEventListener("click", function(){
     setTimeout(()=>toast("Your email app should be opening — just hit send."), 400);
   });
 
   const cp = $("copyOrder");
-  if(cp) cp.addEventListener("click", async function(){
+  if(once(cp)) cp.addEventListener("click", async function(){
     try{
       await navigator.clipboard.writeText(text);
       toast("Order details copied");
@@ -1431,15 +1477,18 @@ $("submitOrder").addEventListener("click", function(){
   pendingOrder = null;
 
   $("rcBody").innerHTML = receiptHTML(lastOrder);
-  wireReceiptLinks(lastOrder);
 
   cart = {}; syncCartUI(); renderList();
-  show("rcSheet");
-
+  show("sendSheet");          // send step first, confirmation after
   runOrderAlert(lastOrder);
 
   btn.disabled = false;
   btn.textContent = "Submit my order";
+});
+
+$("toReceipt").addEventListener("click", function(){
+  if(lastOrder) wireReceiptLinks(lastOrder);
+  show("rcSheet");
 });
 
 $("printRcpt").addEventListener("click", function(){ window.print(); });
