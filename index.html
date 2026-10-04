@@ -344,6 +344,16 @@ footer b{color:var(--text-2)}
 <body>
 
 
+<noscript>
+  <div style="background:#A32B2B;color:#fff;padding:14px 16px;font:600 15px system-ui,sans-serif;text-align:center">
+    This page needs JavaScript turned on to take your order. Please enable it in your browser settings and reload.
+  </div>
+</noscript>
+<div id="bootErr" hidden style="background:#A32B2B;color:#fff;padding:14px 16px;font:600 14px system-ui,sans-serif;text-align:center;line-height:1.5">
+  Something went wrong loading the shop. Please reload the page — if it keeps happening, call or text us and we'll take your order directly.
+  <span id="bootErrMsg" style="display:block;font-weight:400;font-size:12px;opacity:.8;margin-top:4px"></span>
+</div>
+
 <div class="topbar">
   <div class="wrap">
     <div class="topbar-in">
@@ -720,32 +730,30 @@ function digitsOf(v){ return String(v||"").replace(/[^\d]/g,""); }
 
 
 /* ============================================================
-   AUTOMATIC ORDER ALERTS  —  set these two values and every
+   AUTOMATIC ORDER ALERTS  —  set FORMSPREE_ID below and every
    order is emailed to you the moment the customer taps
-   "Place order". No customer action required.
+   "Place order". No action needed from the customer.
 
    HOW TO GET A FORM ID (free, about 3 minutes):
      1. Go to formspree.io and create a free account.
      2. Click "+ New Form", name it "Orders", and set the
         destination to the email you want orders sent to.
-     3. Formspree shows you an endpoint that looks like
+     3. Formspree shows an endpoint like
         https://formspree.io/f/abcdwxyz
         Copy the part after /f/  (here: abcdwxyz)
      4. Paste it below as FORMSPREE_ID.
 
    WANT A TEXT MESSAGE TOO?
-     Most carriers accept email and deliver it as a text. In
-     Formspree, add a second recipient using your carrier's
-     gateway address for your own number:
+     In Formspree, add a second recipient using your carrier's
+     email-to-text gateway for your own number:
         Verizon    5551234567@vtext.com
         AT&T       5551234567@txt.att.net
         T-Mobile   5551234567@tmomail.net
-     Then every order arrives as both an email and a text.
    ============================================================ */
 const FORMSPREE_ID = "";          // e.g. "abcdwxyz"  — leave "" to disable
 const ALERTS_ENABLED = true;      // set false to turn alerts off entirely
 
-/* Fire the order to Formspree. Resolves true on success, false otherwise.
+/* Send the order to Formspree. Resolves true on success, false otherwise.
    Never blocks the receipt: the customer always sees their confirmation. */
 async function sendOrderAlert(o){
   if(!ALERTS_ENABLED || !FORMSPREE_ID) return false;
@@ -1461,11 +1469,23 @@ function applySettings(){
   $("footContact").textContent = bits.join(" · ");
 }
 
-/* ---------------- boot ---------------- */
-applySettings();
-renderChips();
-renderList();
-syncCartUI();
+/* ---------------- boot ----------------
+   If anything throws while starting up, say so plainly instead of
+   leaving the customer with buttons that silently do nothing. */
+try{
+  applySettings();
+  renderChips();
+  renderList();
+  syncCartUI();
+}catch(bootError){
+  const banner = document.getElementById("bootErr");
+  if(banner){
+    banner.hidden = false;
+    const msg = document.getElementById("bootErrMsg");
+    if(msg) msg.textContent = String(bootError && bootError.message || bootError);
+  }
+  throw bootError;
+}
 </script>
 
 </body>
