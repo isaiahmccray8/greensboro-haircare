@@ -314,9 +314,16 @@ footer b{color:var(--text-2)}
 @media (max-width:420px){ .sendrow{flex-direction:column} }
 .sendbox.sent{background:var(--good-soft); border-color:var(--good)}
 .sendbox.sent h4{color:var(--good)}
-.paidnote{background:var(--surface); border:1px solid var(--good); border-left-width:3px; border-radius:var(--r-sm);
-  padding:12px 13px; margin-top:12px; font-size:14px; line-height:1.45; color:var(--text-2)}
-.paidnote b{color:var(--good)}
+/* payment step */
+.payhead{background:var(--ink); color:#fff; border-radius:var(--r); padding:20px 18px; text-align:center; margin-bottom:18px}
+.payhead-lbl{display:block; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#8AA4B8; font-weight:700}
+.payhead-amt{display:block; font-family:"Outfit",sans-serif; font-size:42px; font-weight:700; line-height:1.1; margin:6px 0 4px; letter-spacing:-.02em}
+.payhead-sub{display:block; font-size:13px; color:#9FC6DC}
+.paystep{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:16px}
+.paystep p{margin:10px 0 0; font-size:14px; color:var(--text-2); line-height:1.45}
+.paystep p.dim{font-size:13px; color:var(--text-3)}
+.paystep .handle{margin-top:6px}
+p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
 .copy{background:var(--surface-2); border:1px solid var(--line); border-radius:5px; font-size:11px; font-weight:700; padding:3px 7px; color:var(--text-2)}
 
 /* ---------- admin ---------- */
@@ -511,8 +518,22 @@ footer b{color:var(--text-2)}
     <div class="totals" id="coTotals" style="margin-top:20px"></div>
   </div>
   <div class="sheet-foot">
-    <button class="btn" id="placeOrder">Place order</button>
+    <button class="btn" id="placeOrder">Continue to payment</button>
     <p style="font-size:12.5px;color:var(--text-3);text-align:center;margin:0">No card details are collected here and nothing is charged automatically.</p>
+  </div>
+</div>
+
+<!-- PAYMENT -->
+<div class="sheet" id="paySheet" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+  <div class="sheet-head">
+    <button class="x" id="backToCheckout" aria-label="Back to delivery details">←</button>
+    <h2 id="payTitle">Send your payment</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="sheet-body" id="payBody"></div>
+  <div class="sheet-foot">
+    <button class="btn" id="submitOrder">Submit my order</button>
+    <button class="btn ghost" id="backToCheckout2">Back</button>
   </div>
 </div>
 
@@ -791,8 +812,9 @@ async function sendOrderAlert(o, kind){
       method:"POST",
       headers:{ "Content-Type":"application/json", "Accept":"application/json" },
       body: JSON.stringify({
-        _subject: kind + " " + o.code + " — " + o.name + (o.shop ? " (" + o.shop + ")" : "")
-                  + " — " + money(o.totals.total),
+        _subject: "NEW ORDER " + o.code + " — " + o.name + (o.shop ? " (" + o.shop + ")" : "")
+                  + " — " + money(o.totals.total)
+                  + (o.pay.when === "now" ? " — PAID via " + o.pay.label : " — pay on delivery"),
         alert_type: kind,
         order_number: o.code,
         customer: o.name,
@@ -802,9 +824,9 @@ async function sendOrderAlert(o, kind){
         address: o.addr,
         delivery_notes: o.notes || "—",
         payment_method: o.pay.label,
-        payment_status: kind === "PAYMENT SENT"
-          ? ("Customer confirmed they sent " + money(o.totals.total) + " via " + o.pay.label)
-          : (o.pay.when === "now" ? "Awaiting payment" : "Paying on delivery"),
+        payment_status: o.pay.when === "now"
+          ? ("PAID \u2014 customer sent " + money(o.totals.total) + " via " + o.pay.label + " before submitting")
+          : ("UNPAID \u2014 collect " + money(o.totals.total) + " on delivery (" + o.pay.label + ")"),
         subtotal: money(o.totals.subtotal),
         tax: o.exempt ? ("EXEMPT (" + o.exemptNum + ")") : money(o.totals.tax),
         total: money(o.totals.total),
@@ -842,6 +864,7 @@ let cart     = loadJSON(LS_CART, {});
 let activeCat = "All";
 let query = "";
 let lastOrder = null;
+let pendingOrder = null;
 let adminUnlocked = false;
 
 function loadJSON(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
@@ -1032,6 +1055,9 @@ function renderPayList(){
 let openSheet = null;
 function show(id){
   if(openSheet) $(openSheet).classList.remove("open");
+  // Clear any lingering toast so it doesn't sit over the sheet's buttons.
+  clearTimeout(toast._t);
+  toastEl.classList.remove("show");
   openSheet = id;
   $(id).classList.add("open");
   scrim.classList.add("open");
@@ -1077,34 +1103,14 @@ function receiptHTML(o){
   const tomorrow = new Date(o.placedAt.getTime()+86400000).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 
   let pay="";
-  const link = payLink(o);
-  // Methods paid up front get a confirm button so the shop knows money moved.
-  const paidConfirm = o.pay.when==="now"
-    ? '<button class="btn" id="paidBtn" style="margin-top:12px">I\'ve sent the '+money(o.totals.total)+'</button>'+
-      '<p style="font-size:12.5px;color:var(--text-2);margin:8px 0 0;text-align:center">Tap this once you\'ve sent it and we\'ll start packing right away.</p>'
-    : '';
-
-  if(link && o.pay.id==="applepay"){
-    pay = '<div class="payinstr"><h4>Pay your '+money(o.totals.total)+' with Apple Pay</h4>'+
-      '<a class="btn" href="'+esc(link)+'" style="margin:4px 0 10px">'+esc(payButtonLabel(o))+'</a>'+
-      '<p style="font-size:13px;color:var(--text-2)">That opens a message to <span class="handle">'+esc(o.pay.handle)+'</span>. Tap the Apple Pay button in Messages, enter <b>'+money(o.totals.total)+'</b>, and send.</p>'+
-      '<p><b>Or just pay at the door</b> — tap your phone to ours when we drop the order off. Either way works.</p>'+
-      '<p style="font-size:13px;color:var(--text-2)">If you send it now, please mention <b>'+esc(o.code)+'</b> so we can match it to your order.</p>'+paidConfirm+'</div>';
-  } else if(link){
-    pay = '<div class="payinstr"><h4>Pay your '+money(o.totals.total)+'</h4>'+
-      '<a class="btn" href="'+esc(link)+'" target="_blank" rel="noopener" style="margin:4px 0 10px">'+esc(payButtonLabel(o))+'</a>'+
-      '<p style="font-size:13px;color:var(--text-2)">That button opens '+esc(o.pay.label)+' with the amount already filled in. If it doesn\'t open, send <b>'+money(o.totals.total)+'</b> manually to <span class="handle">'+esc(o.pay.handle)+'</span></p>'+
-      '<p>Please put <b>'+esc(o.code)+'</b> in the payment note so we can match it to your order. We\'ll text you once it lands.</p>'+
-      '<p style="font-size:13px;color:var(--text-2)">Changed your mind? You can pay at the door instead — just say so when we text.</p>'+paidConfirm+'</div>';
-  } else if(o.pay.id==="zelle"){
-    pay = '<div class="payinstr"><h4>How to send your '+money(o.totals.total)+'</h4>'+
-      '<p>Open your bank app, choose Zelle, and send <b>'+money(o.totals.total)+'</b> to:</p>'+
-      '<p><span class="handle">'+esc(settings.zelle)+'</span></p>'+
-      '<p>Put <b>'+esc(o.code)+'</b> in the note so we can match it to your order. We\'ll text you once it lands — usually within the hour.</p>'+
-      '<p style="font-size:13px;color:var(--text-2)">Rather pay at the door instead? Just tell us when we text — no problem either way.</p>'+paidConfirm+'</div>';
+  if(o.pay.when === "now"){
+    pay = '<div class="payinstr"><h4>\u2713 Payment sent \u2014 '+money(o.totals.total)+' via '+esc(o.pay.label)+'</h4>'+
+      '<p>Thanks! We\u2019ll check it against order <b>'+esc(o.code)+'</b> and text you once it clears \u2014 usually within the hour.</p>'+
+      '<p style="font-size:13px;color:var(--text-2)">If something went wrong sending it, no stress \u2014 send <b>'+money(o.totals.total)+'</b> to '+
+      '<span class="handle">'+esc(o.pay.handle||"")+'</span> or just pay us at the door. Either works.</p></div>';
   } else {
     pay = '<div class="payinstr"><h4>Nothing to pay right now</h4>'+
-      '<p>You picked <b>'+esc(o.pay.label)+'</b>, so you\'ll pay <b>'+money(o.totals.total)+'</b> when we hand off your order.</p>'+
+      '<p>You chose <b>'+esc(o.pay.label)+'</b>, so you\u2019ll pay <b>'+money(o.totals.total)+'</b> when we hand off your order.</p>'+
       '<p style="font-size:13px;color:var(--text-2)">No deposit, no card on file, no charge before delivery.</p></div>';
   }
 
@@ -1172,7 +1178,9 @@ function receiptText(o){
   if(o.totals.delivery>0) L.push("  Delivery: "+money(o.totals.delivery));
   L.push("  TOTAL: "+money(o.totals.total));
   L.push("");
-  L.push("PAYMENT: "+o.pay.label);
+  L.push("PAYMENT: "+o.pay.label+(o.pay.when==="now"
+    ? " — customer sent "+money(o.totals.total)+" before submitting"
+    : " — COLLECT "+money(o.totals.total)+" ON DELIVERY"));
   L.push("");
   L.push("Thank you for your order.");
   return L.join("\n");
@@ -1278,16 +1286,58 @@ $("placeOrder").addEventListener("click", function(){
     err.hidden=false; return;
   }
 
-  lastOrder = buildOrder();
-  $("rcBody").innerHTML = receiptHTML(lastOrder);
-  wireReceiptLinks(lastOrder);
-  wirePaidButton(lastOrder);
-
-  cart = {}; syncCartUI(); renderList();
-  show("rcSheet");
-
-  runOrderAlert(lastOrder);
+  // Build the order now so it has a number the customer can put in the
+  // payment note, but don't confirm it until they submit.
+  pendingOrder = buildOrder();
+  renderPaySheet(pendingOrder);
+  show("paySheet");
 });
+
+/* ---------- payment step (between checkout and confirmation) ---------- */
+function renderPaySheet(o){
+  const amt = money(o.totals.total);
+  const link = payLink(o);
+  let h = ''+
+    '<div class="payhead">'+
+      '<span class="payhead-lbl">Amount due</span>'+
+      '<span class="payhead-amt tnum">'+amt+'</span>'+
+      '<span class="payhead-sub">'+esc(o.pay.label)+' · order '+esc(o.code)+'</span>'+
+    '</div>';
+
+  if(o.pay.when === "now"){
+    if(link && o.pay.id==="applepay"){
+      h += '<div class="paystep">'+
+        '<a class="btn" href="'+esc(link)+'">Open Messages to send '+amt+'</a>'+
+        '<p>That opens a message to <span class="handle">'+esc(o.pay.handle)+'</span>. Tap the Apple Pay button in Messages, enter <b>'+amt+'</b>, and send.</p>'+
+        '<p class="dim">Prefer to pay at the door? Go back and choose &ldquo;Cash or card on delivery&rdquo; instead.</p>'+
+      '</div>';
+    } else if(link){
+      h += '<div class="paystep">'+
+        '<a class="btn" href="'+esc(link)+'" target="_blank" rel="noopener">Open '+esc(o.pay.label)+' and pay '+amt+'</a>'+
+        '<p>The amount is filled in for you. If the button doesn\'t open, send <b>'+amt+'</b> to <span class="handle">'+esc(o.pay.handle)+'</span></p>'+
+      '</div>';
+    } else {
+      h += '<div class="paystep">'+
+        '<p>Open your bank app, choose Zelle, and send <b>'+amt+'</b> to:</p>'+
+        '<p><span class="handle">'+esc(o.pay.handle)+'</span></p>'+
+      '</div>';
+    }
+    h += '<div class="note" style="margin-top:14px"><b>Put <span class="tnum">'+esc(o.code)+'</span> in the payment note</b> so we can match your money to your order.</div>'+
+      '<p class="dim" style="margin-top:14px;text-align:center">Once you\'ve sent it, tap <b>Submit my order</b> below and we\'ll start packing.</p>';
+  } else {
+    h += '<div class="paystep">'+
+      '<h4 style="color:var(--good);font-size:15px;margin-bottom:6px">Nothing to pay right now</h4>'+
+      '<p>You chose <b>'+esc(o.pay.label)+'</b>, so you\'ll pay <b>'+amt+'</b> when we hand off your order.</p>'+
+      '<p class="dim">No deposit, no card on file, no charge before delivery.</p>'+
+    '</div>'+
+    '<p class="dim" style="margin-top:14px;text-align:center">Tap <b>Submit my order</b> below and we\'ll get it ready.</p>';
+  }
+
+  $("payBody").innerHTML = h;
+  $("submitOrder").textContent = o.pay.when === "now"
+    ? "I've sent it — submit my order"
+    : "Submit my order";
+}
 
 /* Fire the "order placed" alert and reflect the result in the receipt.
    The receipt is already on screen, so this never blocks the customer. */
@@ -1318,31 +1368,6 @@ function runOrderAlert(o){
         '<button class="btn ghost" id="copyOrder" style="margin-top:9px">Copy order details</button>';
       wireReceiptLinks(o);
     }
-  });
-}
-
-/* The customer confirming they sent payment. Sends a second alert so the
-   shop knows money actually moved, and always acknowledges on screen. */
-function wirePaidButton(o){
-  const btn = $("paidBtn");
-  if(!btn) return;
-  btn.addEventListener("click", function(){
-    btn.disabled = true;
-    btn.textContent = "Letting the shop know…";
-    const done = function(sent){
-      const wrap = btn.parentNode;
-      if(!wrap) return;
-      const msg = document.createElement("div");
-      msg.className = "paidnote";
-      msg.innerHTML = sent
-        ? '<b>✓ Thank you — payment noted.</b> The shop just got the alert and your order is being packed. '+
-          'They’ll text you before delivery.'
-        : '<b>✓ Thanks — noted.</b> We couldn’t reach the shop automatically, so please send them '+
-          'your order number <b>'+esc(o.code)+'</b> using one of the buttons below so they know to start packing.';
-      btn.replaceWith(msg);
-      toast(sent ? "Payment confirmed — thank you" : "Noted — please also send us a message");
-    };
-    sendOrderAlert(o, "PAYMENT SENT").then(done).catch(function(){ done(false); });
   });
 }
 
@@ -1390,6 +1415,32 @@ function wireReceiptLinks(o){
     }
   });
 }
+
+/* Submit — the single moment the order is confirmed and the shop is told. */
+$("backToCheckout").addEventListener("click", function(){ show("coSheet"); });
+$("backToCheckout2").addEventListener("click", function(){ show("coSheet"); });
+
+$("submitOrder").addEventListener("click", function(){
+  if(!pendingOrder) return;
+  const btn = $("submitOrder");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+
+  lastOrder = pendingOrder;
+  lastOrder.paidNow = lastOrder.pay.when === "now";
+  pendingOrder = null;
+
+  $("rcBody").innerHTML = receiptHTML(lastOrder);
+  wireReceiptLinks(lastOrder);
+
+  cart = {}; syncCartUI(); renderList();
+  show("rcSheet");
+
+  runOrderAlert(lastOrder);
+
+  btn.disabled = false;
+  btn.textContent = "Submit my order";
+});
 
 $("printRcpt").addEventListener("click", function(){ window.print(); });
 
