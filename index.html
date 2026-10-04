@@ -316,6 +316,40 @@ footer b{color:var(--text-2)}
 .sendrow .btn{flex:1; padding:12px 10px; font-size:14.5px}
 @media (max-width:420px){ .sendrow{flex-direction:column} }
 .sendpick{display:flex; flex-direction:column; gap:10px; margin-top:16px}
+.discountrow{display:flex; gap:9px; align-items:stretch}
+.discountrow input{flex:1; padding:11px 12px; border:1px solid var(--line); border-radius:var(--r-sm);
+  background:var(--surface); font-size:16px; text-transform:uppercase; letter-spacing:.04em}
+.discountrow input:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px var(--accent-soft)}
+.discountrow .btn{width:auto; flex:0 0 auto; padding:11px 18px; font-size:14.5px; border-radius:var(--r-sm)}
+.codemsg{margin-top:9px; font-size:13.5px; font-weight:600; padding:9px 11px; border-radius:var(--r-sm); line-height:1.4}
+.codemsg.good{background:var(--good-soft); color:var(--good)}
+.codemsg.bad{background:var(--crit-soft); color:var(--crit)}
+.codemsg.warn{background:var(--warn-soft); color:var(--warn)}
+.trow.discount{color:var(--good); font-weight:600}
+.catrow{display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:14px 0; border-bottom:1px solid var(--line)}
+.catrow:last-of-type{border-bottom:0}
+.catinfo{flex:1 1 180px; min-width:0}
+.catinfo b{display:block; font-family:"Outfit",sans-serif; font-size:15px}
+.catinfo span{display:block; font-size:12.5px; color:var(--text-3); margin-top:2px}
+.catacts{display:flex; gap:8px; flex:0 0 auto}
+.catacts .btn{width:auto; padding:9px 14px; font-size:13.5px; border-radius:var(--r-sm)}
+.catbtn{display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line);
+  color:var(--text); padding:9px 14px; border-radius:999px; font-weight:600; font-size:14px}
+.catbtn:hover{border-color:var(--accent); color:var(--accent-ink)}
+.drow{display:grid; grid-template-columns:1fr 78px 64px 64px 34px 34px; gap:7px; align-items:center; padding:9px 0 4px}
+.drow input,.drow select{padding:8px 8px; border:1px solid var(--line); border-radius:6px; font-size:14px; background:var(--surface); width:100%}
+.drow .del{background:var(--crit-soft); color:var(--crit); border:0; border-radius:6px; height:34px; font-weight:700}
+.dhead{display:grid; grid-template-columns:1fr 78px 64px 64px 34px 34px; gap:7px; font-size:10.5px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--line)}
+.don{display:grid; place-items:center}
+.don input{width:18px; height:18px; accent-color:var(--accent)}
+.dnote{width:100%; padding:7px 9px; border:1px dashed var(--line); border-radius:6px; font-size:12.5px;
+  background:transparent; color:var(--text-2); margin-bottom:10px}
+@media (max-width:520px){
+  .dhead{display:none}
+  .drow{grid-template-columns:1fr 70px 56px; grid-auto-rows:auto}
+  .drow .del,.don{grid-column:span 1}
+}
 .sendpick .note{margin:0}
 .sendbox.sent{background:var(--good-soft); border-color:var(--good)}
 .sendbox.sent h4{color:var(--good)}
@@ -429,7 +463,8 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
     <h3>Ordering with us</h3>
     <p id="aboutText">We carry the full Influance professional line and deliver across Greensboro and the Triad. Place your order by 6 PM and it arrives the next day.</p>
     <p><b>Questions before you order?</b> Call or text <a id="contactPhoneLink" href="tel:">(set your number)</a> or email <a id="contactEmailLink" href="mailto:">(set your email)</a>. A real person answers.</p>
-    <p style="font-size:13.5px;color:var(--text-3)">Prices shown are per unit. North Carolina sales tax is calculated at checkout and shown as its own line — nothing is added that you can't see. Licensed shops buying for resale can mark the order tax-exempt at checkout.</p>
+    <p style="margin-bottom:14px"><button class="catbtn" id="openCatalogs">📄 Browse catalogs &amp; price lists</button></p>
+    <p style="font-size:13.5px;color:var(--text-3)">Prices shown are per unit. North Carolina sales tax is calculated at checkout and shown as its own line — nothing is added that you can't see.</p>
   </div>
 </div>
 
@@ -504,18 +539,12 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
       <textarea id="fNotes" placeholder="Best time to drop off, where to leave it, gate code…"></textarea>
     </div>
 
-    <div class="sec-label">Sales tax</div>
-    <label class="checkline" for="fExempt">
-      <input type="checkbox" id="fExempt">
-      <span>
-        <b>This is a resale purchase — don't charge me tax</b>
-        <span>Only check this if your shop holds a North Carolina Certificate of Resale. We'll need the number on file before delivery.</span>
-      </span>
-    </label>
-    <div class="field" id="exemptWrap" hidden style="margin-top:12px">
-      <label for="fExemptNum">NC resale certificate number <span class="req">*</span></label>
-      <input id="fExemptNum" placeholder="e.g. 600123456">
+    <div class="sec-label">Discount code</div>
+    <div class="discountrow">
+      <input id="fCode" placeholder="Have a code? Enter it here" autocomplete="off" aria-label="Discount code">
+      <button type="button" class="btn" id="applyCode">Apply</button>
     </div>
+    <div id="codeMsg" class="codemsg" hidden></div>
 
     <div class="sec-label">How do you want to pay?</div>
     <div class="paylist" id="payList"></div>
@@ -539,6 +568,18 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
   <div class="sheet-foot">
     <button class="btn" id="submitOrder">Submit my order</button>
     <button class="btn ghost" id="backToCheckout2">Back</button>
+  </div>
+</div>
+
+<!-- CATALOGS -->
+<div class="sheet" id="catSheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+  <div class="sheet-head">
+    <h2 id="catTitle">Catalogs &amp; price lists</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="sheet-body" id="catBody"></div>
+  <div class="sheet-foot">
+    <button class="btn ghost" data-close>Back to shopping</button>
   </div>
 </div>
 
@@ -765,12 +806,12 @@ const BASE_CATALOG = [
    THAT device shows — bump `v` whenever these defaults change so saved
    settings pick up the new values. */
 const DEFAULT_SETTINGS = {
-  v:2,
+  v:3,
   storeName:"Greensboro Haircare",
   tagline:"Influance pro line · Greensboro delivery",
   about:"We carry the full Influance professional line and deliver across Greensboro and the Triad. Place your order by 6 PM and it arrives the next day.",
   phone:"336-314-5959",
-  email:"",
+  email:"wilbertartis@gmail.com",
   taxRate:6.75,
   taxLabel:"NC sales tax (Guilford County)",
   deliveryFee:0,
@@ -782,7 +823,26 @@ const DEFAULT_SETTINGS = {
   paypal:"",
   venmo:"",
   acceptCash:true,
-  adminPin:"1234"
+  adminPin:"Artis",
+
+  /* Discount codes. type "pct" = percent off, "amt" = dollars off.
+     `min` is the subtotal a customer must reach to use it (0 = any order).
+     Edit, add or switch these off in Owner tools → Discount codes. */
+  discounts:[
+    {code:"FIRSTCHAIR", type:"pct", value:10, min:0,   on:true,  note:"10% off a first order"},
+    {code:"BACKBAR",    type:"pct", value:15, min:100, on:true,  note:"15% off restocks over $100"},
+    {code:"FULLSHELF",  type:"pct", value:20, min:250, on:true,  note:"20% off big shelf orders"},
+    {code:"TRIAD5",     type:"amt", value:5,  min:40,  on:true,  note:"$5 off orders over $40"}
+  ],
+
+  /* Catalog PDFs sitting next to index.html on your site. */
+  catalogs:[
+    {file:"catalogs/professional-price-list.pdf", title:"Professional Price List", note:"Salon pricing · 3 pages"},
+    {file:"catalogs/retail-price-list.pdf",       title:"Retail Price List",       note:"Shelf pricing · 2 pages"},
+    {file:"catalogs/product-brochure.pdf",        title:"Product Brochure",        note:"The full line with descriptions · 39 pages"},
+    {file:"catalogs/color-catalog.pdf",           title:"Color Catalog",           note:"Every shade · 16 pages"},
+    {file:"catalogs/mission-statement.pdf",       title:"Influance Mission Statement", note:"About the brand we carry · 1 page"}
+  ]
 };
 
 /* Strip a leading $ / @ and any spaces from a payment handle. */
@@ -845,7 +905,8 @@ async function sendOrderAlert(o, kind){
           ? ("PAID \u2014 customer sent " + money(o.totals.total) + " via " + o.pay.label + " before submitting")
           : ("UNPAID \u2014 collect " + money(o.totals.total) + " on delivery (" + o.pay.label + ")"),
         subtotal: money(o.totals.subtotal),
-        tax: o.exempt ? ("EXEMPT (" + o.exemptNum + ")") : money(o.totals.tax),
+        discount: o.totals.discount > 0 ? (o.discountCode + " \u2212" + money(o.totals.discount)) : "none",
+        tax: money(o.totals.tax),
         total: money(o.totals.total),
         full_receipt: receiptText(o)
       })
@@ -882,6 +943,7 @@ let activeCat = "All";
 let query = "";
 let lastOrder = null;
 let pendingOrder = null;
+let activeCode = null;   // {code, type, value, label, amount}
 let adminUnlocked = false;
 
 function loadJSON(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
@@ -956,29 +1018,57 @@ function cartItems(){
 }
 function cartCount(){ return cartItems().reduce((n,l)=>n+l.qty,0); }
 
-function computeTotals(exempt){
+function computeTotals(){
   const items = cartItems();
   const subtotal = items.reduce((s,l)=> s + l.p.price*l.qty, 0);
-  const rate = exempt ? 0 : (Number(settings.taxRate)||0);
-  const tax = Math.round(subtotal * rate) / 100;
+
+  // Discount comes off the subtotal, so tax is charged on what's actually paid.
+  let discount = 0;
+  if(activeCode && subtotal >= (activeCode.min||0)){
+    discount = activeCode.type === "pct"
+      ? Math.round(subtotal * activeCode.value) / 100
+      : Math.min(activeCode.value, subtotal);
+    discount = Math.round(discount*100)/100;
+  }
+  const taxable = Math.max(0, Math.round((subtotal - discount)*100)/100);
+
+  const rate = Number(settings.taxRate)||0;
+  const tax = Math.round(taxable * rate) / 100;
+
   let delivery = Number(settings.deliveryFee)||0;
   if(settings.freeOver>0 && subtotal >= Number(settings.freeOver)) delivery = 0;
   if(items.length===0) delivery = 0;
-  const total = Math.round((subtotal + tax + delivery)*100)/100;
-  return {items:items, subtotal:subtotal, tax:tax, rate:rate, delivery:delivery, total:total};
+
+  const total = Math.round((taxable + tax + delivery)*100)/100;
+  return {items:items, subtotal:subtotal, discount:discount, taxable:taxable,
+          tax:tax, rate:rate, delivery:delivery, total:total};
 }
 
-function totalsHTML(t, exempt){
-  let h = '<div class="trow"><span>Subtotal ('+t.items.reduce((n,l)=>n+l.qty,0)+' items)</span><span>'+money(t.subtotal)+'</span></div>';
-  if(exempt){
-    h += '<div class="trow"><span>'+esc(settings.taxLabel)+'</span><span>Exempt — $0.00</span></div>';
-  }else{
-    h += '<div class="trow"><span>'+esc(settings.taxLabel)+' · '+(Number(settings.taxRate)||0).toFixed(3).replace(/0+$/,"").replace(/\.$/,"")+'%</span><span>'+money(t.tax)+'</span></div>';
+/* Find a usable code. Returns the matching rule or null. */
+function lookupCode(raw){
+  const want = String(raw||"").trim().toUpperCase().replace(/\s+/g,"");
+  if(!want) return null;
+  const list = settings.discounts || [];
+  for(let i=0;i<list.length;i++){
+    const d = list[i];
+    if(d && d.on !== false && String(d.code||"").trim().toUpperCase() === want) return d;
   }
+  return null;
+}
+
+function totalsHTML(t){
+  let h = '<div class="trow"><span>Subtotal ('+t.items.reduce((n,l)=>n+l.qty,0)+' items)</span><span>'+money(t.subtotal)+'</span></div>';
+  if(t.discount > 0){
+    h += '<div class="trow discount"><span>Discount \u00b7 '+esc(activeCode.code)+'</span><span>\u2212'+money(t.discount)+'</span></div>';
+  }
+  h += '<div class="trow"><span>'+esc(settings.taxLabel)+' \u00b7 '+(Number(settings.taxRate)||0)+'%</span><span>'+money(t.tax)+'</span></div>';
   if(t.delivery>0) h += '<div class="trow"><span>Delivery</span><span>'+money(t.delivery)+'</span></div>';
   else if(t.items.length) h += '<div class="trow"><span>Delivery</span><span>Free</span></div>';
   h += '<div class="trow grand"><span>Total</span><span>'+money(t.total)+'</span></div>';
-  if(!exempt) h += '<p class="taxnote">Tax is '+ (Number(settings.taxRate)||0) +'% of the '+money(t.subtotal)+' subtotal, rounded to the cent.</p>';
+  if(t.items.length){
+    h += '<p class="taxnote">Tax is '+(Number(settings.taxRate)||0)+'% of '+money(t.taxable)+
+         (t.discount>0 ? ' (after your discount)' : '')+', rounded to the cent.</p>';
+  }
   return h;
 }
 
@@ -990,7 +1080,7 @@ function syncCartUI(){
 }
 
 function renderCart(){
-  const t = computeTotals(false);
+  const t = computeTotals();
   if(t.items.length===0){
     $("cartLines").innerHTML = '<div class="empty"><b>Your order is empty</b>Search for a product and tap Add.</div>';
     $("cartTotals").innerHTML = "";
@@ -1013,7 +1103,7 @@ function renderCart(){
       '</div>'+
     '</div>';
   }).join("");
-  $("cartTotals").innerHTML = totalsHTML(t,false);
+  $("cartTotals").innerHTML = totalsHTML(t);
 }
 
 /* ---------------- payment options ---------------- */
@@ -1099,8 +1189,7 @@ function orderCode(){
 }
 
 function buildOrder(){
-  const exempt = $("fExempt").checked;
-  const t = computeTotals(exempt);
+  const t = computeTotals();
   const payId = (document.querySelector('input[name="paym"]:checked')||{}).value || "cash";
   const payOpt = payOptions().filter(o=>o.id===payId)[0] || payOptions()[0];
   return {
@@ -1109,7 +1198,7 @@ function buildOrder(){
     name:$("fName").value.trim(), shop:$("fShop").value.trim(),
     phone:$("fPhone").value.trim(), email:$("fEmail").value.trim(),
     addr:$("fAddr").value.trim(), notes:$("fNotes").value.trim(),
-    exempt:exempt, exemptNum:$("fExemptNum").value.trim(),
+    discountCode: (activeCode && t.discount>0) ? activeCode.code : "",
     pay:payOpt, totals:t
   };
 }
@@ -1145,7 +1234,7 @@ function receiptHTML(o){
         '<span class="q">'+l.qty+' × '+money(l.p.price)+'</span>'+
         '<span class="a">'+money(l.p.price*l.qty)+'</span></div>'
       ).join("")+
-      '<div class="totals">'+totalsHTML(o.totals, o.exempt)+'</div>'+
+      '<div class="totals">'+totalsHTML(o.totals)+'</div>'+
       pay+
       '<div class="sec-label">Delivering to</div>'+
       '<dl class="kv">'+
@@ -1154,7 +1243,7 @@ function receiptHTML(o){
         (o.email?'<dt>Email</dt><dd>'+esc(o.email)+'</dd>':'')+
         '<dt>Address</dt><dd>'+esc(o.addr).replace(/\n/g,"<br>")+'</dd>'+
         (o.notes?'<dt>Notes</dt><dd>'+esc(o.notes)+'</dd>':'')+
-        (o.exempt?'<dt>Resale cert.</dt><dd>'+esc(o.exemptNum)+'</dd>':'')+
+        (o.discountCode?'<dt>Discount</dt><dd>'+esc(o.discountCode)+' \u2212'+money(o.totals.discount)+'</dd>':'')+
         '<dt>Ordered</dt><dd>'+d+' at '+tm+'</dd>'+
       '</dl>'+
       '<div class="note" style="margin-top:18px"><b>What happens next:</b> we confirm your order by text or call, then deliver on '+tomorrow+'. If anything is out of stock we tell you before we charge or deliver anything — we never substitute without asking.</div>'+
@@ -1182,7 +1271,8 @@ function receiptText(o){
   });
   L.push("");
   L.push("  Subtotal: "+money(o.totals.subtotal));
-  L.push("  "+settings.taxLabel+": "+(o.exempt?"EXEMPT ("+o.exemptNum+")":money(o.totals.tax)+" @ "+settings.taxRate+"%"));
+  if(o.totals.discount>0) L.push("  Discount ("+o.discountCode+"): -"+money(o.totals.discount));
+  L.push("  "+settings.taxLabel+": "+money(o.totals.tax)+" @ "+settings.taxRate+"%");
   if(o.totals.delivery>0) L.push("  Delivery: "+money(o.totals.delivery));
   L.push("  TOTAL: "+money(o.totals.total));
   L.push("");
@@ -1243,6 +1333,21 @@ plist.addEventListener("input", function(e){
 
 $("cartBtn").addEventListener("click", function(){ renderCart(); show("cartSheet"); });
 
+$("openCatalogs").addEventListener("click", function(){ renderCatalogs(); show("catSheet"); });
+
+$("applyCode").addEventListener("click", function(){
+  // "Remove" only clears the code that is actually applied. If the customer
+  // typed a different one over it, treat the tap as applying the new code.
+  const typed = String($("fCode").value||"").trim().toUpperCase().replace(/\s+/g,"");
+  if(activeCode && typed === String(activeCode.code||"").toUpperCase()){
+    $("fCode").value = "";
+  }
+  applyDiscountCode();
+});
+$("fCode").addEventListener("keydown", function(e){
+  if(e.key === "Enter"){ e.preventDefault(); applyDiscountCode(); }
+});
+
 $("cartLines").addEventListener("click", function(e){
   const btn=e.target.closest("button"); if(!btn) return;
   const line=e.target.closest(".cline"); const id=line.dataset.id;
@@ -1260,19 +1365,47 @@ $("cartLines").addEventListener("input", function(e){
 
 $("toCheckout").addEventListener("click", function(){
   renderPayList();
+  if(activeCode) applyDiscountCode();   // re-check min spend against the current cart
   refreshCoTotals();
   show("coSheet");
 });
 $("backToCart").addEventListener("click", function(){ renderCart(); show("cartSheet"); });
 
 function refreshCoTotals(){
-  const ex = $("fExempt").checked;
-  $("coTotals").innerHTML = totalsHTML(computeTotals(ex), ex);
+  $("coTotals").innerHTML = totalsHTML(computeTotals());
 }
-$("fExempt").addEventListener("change", function(){
-  $("exemptWrap").hidden = !this.checked;
+
+/* Apply (or clear) a discount code and explain the result plainly. */
+function applyDiscountCode(){
+  const raw = $("fCode").value;
+  const msg = $("codeMsg");
+  const sub = cartItems().reduce((n,l)=> n + l.p.price*l.qty, 0);
+
+  if(!String(raw).trim()){
+    activeCode = null; msg.hidden = true; $("fCode").value = "";
+    $("applyCode").textContent = "Apply"; refreshCoTotals(); return;
+  }
+  const rule = lookupCode(raw);
+  if(!rule){
+    activeCode = null;
+    msg.className = "codemsg bad"; msg.hidden = false;
+    msg.textContent = "We don't recognize that code. Double-check the spelling, or leave it blank.";
+    $("applyCode").textContent = "Apply"; refreshCoTotals(); return;
+  }
+  if(sub < (rule.min||0)){
+    activeCode = null;
+    msg.className = "codemsg warn"; msg.hidden = false;
+    msg.textContent = rule.code + " needs a subtotal of " + money(rule.min) + ". You're at " +
+                      money(sub) + " \u2014 add " + money(rule.min - sub) + " more to use it.";
+    $("applyCode").textContent = "Apply"; refreshCoTotals(); return;
+  }
+  activeCode = rule;
   refreshCoTotals();
-});
+  const t = computeTotals();
+  msg.className = "codemsg good"; msg.hidden = false;
+  msg.textContent = rule.code + " applied \u2014 you saved " + money(t.discount) + ".";
+  $("applyCode").textContent = "Remove";
+}
 
 $("placeOrder").addEventListener("click", function(){
   const err=$("coErr"); err.hidden=true;
@@ -1280,7 +1413,6 @@ $("placeOrder").addEventListener("click", function(){
   if(!$("fName").value.trim()) miss.push("your name");
   if(!$("fPhone").value.trim()) miss.push("a phone number");
   if(!$("fAddr").value.trim()) miss.push("a delivery address");
-  if($("fExempt").checked && !$("fExemptNum").value.trim()) miss.push("your resale certificate number");
   if(miss.length){
     err.textContent = "We still need "+miss.join(", ")+" to get this delivered.";
     err.hidden=false;
@@ -1288,7 +1420,7 @@ $("placeOrder").addEventListener("click", function(){
     return;
   }
   const min = Number(settings.minOrder)||0;
-  const t = computeTotals($("fExempt").checked);
+  const t = computeTotals();
   if(min>0 && t.subtotal<min){
     err.textContent = "Our minimum order is "+money(min)+". You're at "+money(t.subtotal)+" — add a little more and we'll bring it out.";
     err.hidden=false; return;
@@ -1300,6 +1432,42 @@ $("placeOrder").addEventListener("click", function(){
   renderPaySheet(pendingOrder);
   show("paySheet");
 });
+
+/* ---------- catalogs ---------- */
+function renderCatalogs(){
+  const list = settings.catalogs || [];
+  if(!list.length){ $("catBody").innerHTML = '<div class="empty">No catalogs have been added yet.</div>'; return; }
+
+  // The PDFs sit next to index.html on the live site. Inside the Claude
+  // preview there is no such folder, so say that instead of showing dead links.
+  const isPreview = typeof window.claude !== "undefined";
+  if(isPreview){
+    $("catBody").innerHTML =
+      '<div class="note" style="margin-bottom:16px"><b>Preview note — only you see this.</b> '+
+      'The catalog files live next to the app on your real site, so these open and print there. '+
+      'In this Claude preview there is no catalogs folder, so the buttons below won’t do anything yet.</div>'+
+      list.map(function(c){
+        return '<div class="catrow"><div class="catinfo"><b>'+esc(c.title)+'</b>'+
+          '<span>'+esc(c.note||"")+'</span></div>'+
+          '<div class="catacts"><span class="dim" style="font-size:12.5px">on the live site</span></div></div>';
+      }).join("");
+    return;
+  }
+
+  $("catBody").innerHTML =
+    '<p class="dim" style="margin:0 0 16px">Open any sheet to read it, print it, or save it to your phone. '+
+    'They come straight from Influance.</p>'+
+    list.map(function(c){
+      return '<div class="catrow">'+
+        '<div class="catinfo"><b>'+esc(c.title)+'</b><span>'+esc(c.note||"")+'</span></div>'+
+        '<div class="catacts">'+
+          '<a class="btn" href="'+esc(c.file)+'" target="_blank" rel="noopener">Open / print</a>'+
+          '<a class="btn ghost" href="'+esc(c.file)+'" download>Download</a>'+
+        '</div>'+
+      '</div>';
+    }).join("")+
+    '<p class="dim" style="margin-top:16px">Printing: open a sheet, then use your browser or phone\u2019s print option.</p>';
+}
 
 /* ---------- payment step (between checkout and confirmation) ---------- */
 function renderPaySheet(o){
@@ -1478,7 +1646,8 @@ $("submitOrder").addEventListener("click", function(){
 
   $("rcBody").innerHTML = receiptHTML(lastOrder);
 
-  cart = {}; syncCartUI(); renderList();
+  cart = {}; activeCode = null; syncCartUI(); renderList();
+  $("fCode").value = ""; $("codeMsg").hidden = true; $("applyCode").textContent = "Apply";
   show("sendSheet");          // send step first, confirmation after
   runOrderAlert(lastOrder);
 
@@ -1520,7 +1689,7 @@ document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeAll(
 /* ---------------- admin ---------------- */
 $("adminBtn").addEventListener("click", function(){
   if(!adminUnlocked){
-    const pin = prompt("Owner PIN\n\n(Default is 1234 — change it in Owner tools → Store.)");
+    const pin = prompt("Owner password");
     if(pin===null) return;
     if(pin !== String(settings.adminPin)){ toast("That PIN didn't match"); return; }
     adminUnlocked = true;
@@ -1532,9 +1701,10 @@ $("adminBtn").addEventListener("click", function(){
 function renderAdmin(tab){
   const s=settings;
   let h = '<div class="tabs">'+
-    ['store','products','payments'].map(t =>
+    ['store','products','payments','discounts'].map(t =>
       '<button class="tab" data-tab="'+t+'" aria-selected="'+(t===tab)+'">'+
-      (t==="store"?"Store &amp; tax":t==="products"?"Products &amp; prices":"Payment handles")+'</button>'
+      (t==="store"?"Store &amp; tax":t==="products"?"Products &amp; prices":
+       t==="payments"?"Payment handles":"Discount codes")+'</button>'
     ).join("")+'</div>';
 
   if(tab==="store"){
@@ -1572,6 +1742,33 @@ function renderAdmin(tab){
       '<div class="note" style="margin-top:14px;border-left-color:var(--warn);background:var(--warn-soft)"><b>Heads up:</b> what you change here is saved in <b>this browser only</b> — your customers still see the handles built into the file. The ones above are already built in, so there\'s nothing you need to do. If you change them here and want customers to see the change, send me the new details and I\'ll bake them into a fresh file.</div>';
   }
 
+  if(tab==="discounts"){
+    const list = settings.discounts || [];
+    h += '<div class="note" style="margin-bottom:14px"><b>Codes customers can type at checkout.</b> '+
+      'Percent takes that much off the subtotal; Dollars takes a flat amount off. '+
+      '<b>Min</b> is the subtotal they have to reach \u2014 set it to 0 for any order. '+
+      'Untick <b>On</b> to retire a code without deleting it. Tax is charged on the discounted amount, which is how NC expects it.</div>'+
+      '<div class="dhead"><span>Code</span><span>Type</span><span>Value</span><span>Min $</span><span>On</span><span></span></div>'+
+      '<div id="drows">'+ list.map(function(d,i){
+        return '<div class="drow" data-i="'+i+'">'+
+          '<input value="'+esc(d.code)+'" data-f="code" aria-label="Code">'+
+          '<select data-f="type" aria-label="Type">'+
+            '<option value="pct"'+(d.type!=="amt"?" selected":"")+'>% off</option>'+
+            '<option value="amt"'+(d.type==="amt"?" selected":"")+'>$ off</option>'+
+          '</select>'+
+          '<input value="'+esc(d.value)+'" data-f="value" type="number" step="0.01" inputmode="decimal" aria-label="Value">'+
+          '<input value="'+esc(d.min||0)+'" data-f="min" type="number" step="0.01" inputmode="decimal" aria-label="Minimum subtotal">'+
+          '<label class="don"><input type="checkbox" data-f="on"'+(d.on!==false?" checked":"")+' aria-label="Enabled"></label>'+
+          '<button class="del" data-ddel="'+i+'" aria-label="Delete code">\u2715</button>'+
+        '</div>'+
+        '<input class="dnote" value="'+esc(d.note||"")+'" data-f="note" placeholder="What this code is for (only you see this)" aria-label="Note">';
+      }).join("")+'</div>'+
+      '<button class="btn ghost" id="addCode" style="margin-top:14px">Add a code</button>'+
+      '<div class="note" style="margin-top:14px;border-left-color:var(--warn);background:var(--warn-soft)">'+
+      '<b>Same rule as the other tabs:</b> changes here save in this browser only. '+
+      'Send me the codes you want live for customers and I\u2019ll build them into the file.</div>';
+  }
+
   if(tab==="products"){
     h += '<div class="note" style="margin-bottom:14px">Edit any price, name or size. Blank the name to drop a line when you save.</div>'+
       '<div class="ahead"><span>Product</span><span>Size</span><span>Price $</span><span></span></div>'+
@@ -1602,6 +1799,19 @@ $("adBody").addEventListener("click", function(e){
     catalog.push({id:"c"+Date.now(), name:"New product", cat:activeCat==="All"?"Go Natural":activeCat, size:"8 oz", price:0, desc:""});
     renderAdmin("products");
     $("adBody").querySelector(".sheet-body,#arows")?.scrollIntoView({block:"end"});
+    return;
+  }
+  if(e.target.id==="addCode"){
+    collectAdmin();
+    settings.discounts = (settings.discounts||[]).concat([{code:"NEWCODE", type:"pct", value:10, min:0, on:true, note:""}]);
+    renderAdmin("discounts");
+    return;
+  }
+  const ddel=e.target.closest("[data-ddel]");
+  if(ddel){
+    collectAdmin();
+    settings.discounts.splice(Number(ddel.dataset.ddel),1);
+    renderAdmin("discounts");
     return;
   }
   if(e.target.id==="resetCat"){
@@ -1638,6 +1848,20 @@ function collectAdmin(){
     settings.applepay=v("sApplepay")||"";
     settings.acceptCash=$("sCash")?$("sCash").checked:true;
   }
+  if(tab==="discounts"){
+    const rows=[...document.querySelectorAll("#drows .drow")];
+    const out=[];
+    rows.forEach(function(r){
+      const g=f=>r.querySelector('[data-f="'+f+'"]');
+      const note=r.nextElementSibling && r.nextElementSibling.classList.contains("dnote") ? r.nextElementSibling.value : "";
+      const code=g("code").value.trim().toUpperCase().replace(/\s+/g,"");
+      if(!code) return;
+      out.push({code:code, type:g("type").value, value:Number(g("value").value)||0,
+                min:Number(g("min").value)||0, on:g("on").checked, note:note});
+    });
+    settings.discounts = out;
+  }
+
   if(tab==="products"){
     const rows=[...document.querySelectorAll("#arows .arow")];
     rows.forEach(function(r){
