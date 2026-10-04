@@ -1008,7 +1008,45 @@ function mergeSettings(stored){
   return out;
 }
 let settings = mergeSettings(loadJSON(LS_SET, null));
-let catalog  = loadJSON(LS_CAT, null) || BASE_CATALOG.slice();
+/* Bump this whenever BASE_CATALOG gains structure (shades, categories,
+   new products). A catalog saved by an older build would otherwise override
+   the built-in one forever, and the new structure would never appear. */
+const CATALOG_VERSION = 2;
+
+/* Rebuild the catalog from the shipped list, carrying over any price, name
+   or size the owner edited on this device. Structure always comes from the
+   shipped list so new fields can never go missing. */
+function mergeCatalog(stored){
+  const base = BASE_CATALOG.map(p=>Object.assign({}, p));
+  if(!stored) return base;
+
+  const items = Array.isArray(stored) ? stored : (stored.items || []);
+  const version = Array.isArray(stored) ? 0 : (stored.v || 0);
+  if(!items.length) return base;
+
+  if(version === CATALOG_VERSION){
+    // Same structure — trust what was saved, but heal any missing shades.
+    return items.map(function(it){
+      const src = BASE_CATALOG.filter(b=>b.id===it.id)[0];
+      if(src && src.shades && !it.shades) it.shades = src.shades;
+      return it;
+    });
+  }
+
+  // Older save: keep the owner's edits, take everything else from the build.
+  const byId = {};
+  items.forEach(function(it){ if(it && it.id) byId[it.id] = it; });
+  base.forEach(function(p){
+    const old = byId[p.id];
+    if(!old) return;
+    if(typeof old.price === "number") p.price = old.price;
+    if(old.name) p.name = old.name;
+    if(old.size) p.size = old.size;
+  });
+  return base;
+}
+
+let catalog = mergeCatalog(loadJSON(LS_CAT, null));
 let cart     = loadJSON(LS_CART, {});
 let activeCat = "All";
 let query = "";
@@ -2027,7 +2065,9 @@ $("adBody").addEventListener("click", function(e){
   }
   if(e.target.id==="resetCat"){
     if(confirm("Reset every product and price back to the printed Influance price list?")){
-      catalog = BASE_CATALOG.slice(); renderAdmin("products"); toast("Catalog reset");
+      catalog = BASE_CATALOG.map(p=>Object.assign({},p));
+      saveJSON(LS_CAT,{v:CATALOG_VERSION, items:catalog});
+      renderChips(); renderList(); renderAdmin("products"); toast("Catalog reset to the printed list");
     }
     return;
   }
@@ -2087,7 +2127,7 @@ function collectAdmin(){
 
 $("adSave").addEventListener("click", function(){
   collectAdmin();
-  saveJSON(LS_SET,settings); saveJSON(LS_CAT,catalog);
+  saveJSON(LS_SET,settings); saveJSON(LS_CAT,{v:CATALOG_VERSION, items:catalog});
   applySettings(); renderChips(); renderList();
   toast("Saved on this device");
 });
