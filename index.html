@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Order professional Influance hair care products with next-day delivery in Greensboro and the Triad.">
 <meta name="theme-color" content="#0B1A2B">
-<title>Greensboro Haircare Orders</title>
+<title>Triad Beauty Supply Orders</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Outfit:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
@@ -190,15 +190,30 @@ footer b{color:var(--text-2)}
 /* ---------- sheet / modal ---------- */
 .scrim{position:fixed; inset:0; background:rgba(6,15,26,.55); z-index:60; opacity:0; pointer-events:none; transition:opacity .18s}
 .scrim.open{opacity:1; pointer-events:auto}
+/* A closed sheet must be completely inert. opacity:0 alone still swallows
+   clicks, which on wide screens left invisible panels covering the page. */
 .sheet{
   position:fixed; z-index:70; left:0; right:0; bottom:0; max-height:92vh; background:var(--paper);
-  border-radius:18px 18px 0 0; box-shadow:var(--shadow-lg); transform:translateY(101%); transition:transform .24s cubic-bezier(.3,.8,.4,1);
+  border-radius:18px 18px 0 0; box-shadow:var(--shadow-lg); transform:translateY(101%);
   display:flex; flex-direction:column;
+  visibility:hidden; pointer-events:none;
+  transition:transform .24s cubic-bezier(.3,.8,.4,1), visibility 0s linear .24s;
 }
-.sheet.open{transform:translateY(0)}
+.sheet.open{
+  transform:translateY(0);
+  visibility:visible; pointer-events:auto;
+  transition:transform .24s cubic-bezier(.3,.8,.4,1), visibility 0s;
+}
 @media (min-width:700px){
-  .sheet{left:50%; right:auto; bottom:auto; top:50%; width:660px; max-height:88vh; border-radius:16px; transform:translate(-50%,-44%) scale(.98); opacity:0; transition:transform .2s, opacity .2s}
-  .sheet.open{transform:translate(-50%,-50%) scale(1); opacity:1}
+  .sheet{
+    left:50%; right:auto; bottom:auto; top:50%; width:660px; max-height:88vh; border-radius:16px;
+    transform:translate(-50%,-44%) scale(.98); opacity:0;
+    transition:transform .2s, opacity .2s, visibility 0s linear .2s;
+  }
+  .sheet.open{
+    transform:translate(-50%,-50%) scale(1); opacity:1;
+    transition:transform .2s, opacity .2s, visibility 0s;
+  }
 }
 .sheet-head{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); background:var(--surface); border-radius:18px 18px 0 0}
 .sheet-head h2{font-size:18px; flex:1}
@@ -736,8 +751,8 @@ function digitsOf(v){ return String(v||"").replace(/[^\d]/g,""); }
 
    HOW TO GET A FORM ID (free, about 3 minutes):
      1. Go to formspree.io and create a free account.
-     2. Click "+ New Form", name it "Orders", and set the
-        destination to the email you want orders sent to.
+     2. Click "+ New Form", name it "Orders", set the destination
+        to the email you want orders sent to.
      3. Formspree shows an endpoint like
         https://formspree.io/f/abcdwxyz
         Copy the part after /f/  (here: abcdwxyz)
@@ -763,24 +778,16 @@ async function sendOrderAlert(o){
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({
         _subject: "New order " + o.code + " — " + o.name + (o.shop ? " (" + o.shop + ")" : ""),
-        order_number: o.code,
-        customer: o.name,
-        shop: o.shop || "—",
-        phone: o.phone,
-        email: o.email || "—",
-        address: o.addr,
-        delivery_notes: o.notes || "—",
-        payment_method: o.pay.label,
+        order_number: o.code, customer: o.name, shop: o.shop || "—",
+        phone: o.phone, email: o.email || "—", address: o.addr,
+        delivery_notes: o.notes || "—", payment_method: o.pay.label,
         subtotal: money(o.totals.subtotal),
         tax: o.exempt ? ("EXEMPT (" + o.exemptNum + ")") : money(o.totals.tax),
-        total: money(o.totals.total),
-        full_receipt: receiptText(o)
+        total: money(o.totals.total), full_receipt: receiptText(o)
       })
     });
     return res.ok;
-  }catch(err){
-    return false;
-  }
+  }catch(err){ return false; }
 }
 
 /* ---------------- state ---------------- */
