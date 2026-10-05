@@ -829,7 +829,7 @@ const BASE_CATALOG = [
   ["Artistic Semi-Permanent Conditioning Color","Color","8 oz",15.95,"Conditioning semi-permanent color, safe to use after a relaxer.",["Autumn Leaf","Blue Moon","Candy Apple","Cinnamon Brown","Dark Brown","Jet Black","Natural Black","Nutmeg","Red Wine","Sunburst"]],
   ["Artistic Demi & Permanent Hair Color","Color","2 oz",8.50,"Ammonia-free, demi and permanent in one tube. Excellent grey coverage.",["(1N) Black","(3N) Dark Brown","(4A) Medium Ash Brown","(4G) Medium Golden Brown","(4N) Medium Brown","(5B) Medium Chocolate","(5CG) Light Copper Golden Brown","(5CM) Light Copper Mahogany Brown","(5N) Light Brown","(5RC) Light Red Copper","(5V) Light Violet Brown","(6A) Dark Ash Blonde","(6C) Dark Copper Blonde","(6CC) Dark Intense Copper","(6G) Dark Golden Blonde","(6M) Dark Mahogany Blonde","(6RRC) Dark Intense Red Copper Blonde","(7RR) Medium Intense Red Blonde","(8A) Light Ash","(8C) Light Copper Blonde","(8CC) Light Intense Copper Blonde","(8G) Light Golden Blonde","(8N) Light Blonde","(9CG) Very Light Copper Gold Blonde","(9GG) Very Light Intense Golden Blonde","(10A) Very Pale Ash Blonde","(10G) Very Pale Golden Blonde","(10N) Very Pale Blonde","(11A) Special Ash Blonde","(11GA) Special Golden Ash Blonde","(11N) Special Natural Blonde","(12A) Ultra Ash Blonde","(12GG) Ultra Light Intense Gold Blonde","(12N) Ultra Natural Blonde","(BC) Blonding Creme","(T-NA) Natural Ash","(RED) Mixer","(BLUE) Mixer","(CLEAR) Mixer","(GREEN) Mixer","(VIOLET) Mixer","(YELLOW) Mixer"]],
   ["Demi & Permanent Color Swatch Book","Color","each",24.95,""],
-  ["Fun Colors / High Pigments","Color","7 oz",14.95,"Semi-permanent pigment, no developer needed. Most vibrant on pre-lightened hair.",["Blue Magic","Charcoal","Emerald Green","Magenta","Plum","Purple Rain","Red Alert","So Silver","Tangerine","White Paint","Yellow Passion"]],
+  ["Fun Colors / High Pigments","Color","7 oz",14.95,"Semi-permanent pigment, no developer needed. Most vibrant on pre-lightened hair.",["Blue Magic","Charcoal","Emerald Green","Lilac","Magenta","Neon","Plum","Purple Rain","Red Alert","So Silver","Strawberry","Tangerine","Turquoise","White Paint","Yellow Passion"]],
 
   // CREATE: SLEEK & STRAIGHT
   ["Pre-Chemical Treatment","Relaxers & Straightening","6 oz",16.95,""],
@@ -863,7 +863,11 @@ const BASE_CATALOG = [
   // TOOLS
   ["Pump — fits 32 oz","Tools","each",2.50,""],
   ["Pump — fits 64 oz","Tools","each",3.00,""],
-  ["Pump — fits Gallon","Tools","each",3.00,""]
+  ["Pump — fits Gallon","Tools","each",3.00,""],
+  ["Wrap Cap","Tools","each",5.95,"Choose your color.",["Black","Yellow","Red","Blue","Pink"]],
+  ["Apron","Tools","each",22.95,""],
+  ["Shampoo Cape","Tools","each",24.95,""],
+  ["Styling Cape","Tools","each",24.95,""]
 ].map(function(r,i){
   return {id:"p"+i, name:r[0], cat:r[1], size:r[2], price:r[3], desc:r[4]||"", shades:r[5]||null};
 });
@@ -1015,7 +1019,7 @@ let settings = mergeSettings(loadJSON(LS_SET, null));
 /* Bump this whenever BASE_CATALOG gains structure (shades, categories,
    new products). A catalog saved by an older build would otherwise override
    the built-in one forever, and the new structure would never appear. */
-const CATALOG_VERSION = 2;
+const CATALOG_VERSION = 3;
 
 /* Rebuild the catalog from the shipped list, carrying over any price, name
    or size the owner edited on this device. Structure always comes from the
