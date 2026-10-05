@@ -249,6 +249,8 @@ footer b{color:var(--text-2)}
 .field input:focus, .field textarea:focus, .field select:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px var(--accent-soft)}
 .field textarea{min-height:74px; resize:vertical}
 .field .hint{font-size:12.5px; color:var(--text-3); margin-top:4px}
+.field input.bad, .field textarea.bad{border-color:var(--crit); background:var(--crit-soft)}
+.field input.bad:focus, .field textarea.bad:focus{box-shadow:0 0 0 3px var(--crit-soft)}
 .two{display:grid; grid-template-columns:1fr 1fr; gap:12px}
 @media (max-width:460px){ .two{grid-template-columns:1fr} .howto{grid-template-columns:1fr} }
 
@@ -545,29 +547,38 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
         <input id="fName" autocomplete="name">
       </div>
       <div class="field">
-        <label for="fShop">Shop or salon name</label>
-        <input id="fShop" autocomplete="organization">
+        <label for="fLicense">Professional license number <span class="req">*</span></label>
+        <input id="fLicense" autocomplete="off" spellcheck="false" placeholder="e.g. C-123456">
+        <div class="hint">Your state cosmetology, barber or esthetician license.</div>
       </div>
     </div>
+    <div class="note" style="margin:-4px 0 14px">
+      <b>Why we ask:</b> Influance is a professional-only line, so we sell to licensed pros. Your number stays on your order and is never shared.
+    </div>
     <div class="two">
+      <div class="field">
+        <label for="fShop">Shop or salon name <span class="req">*</span></label>
+        <input id="fShop" autocomplete="organization" placeholder="Your own name is fine if you rent a booth">
+      </div>
       <div class="field">
         <label for="fPhone">Phone <span class="req">*</span></label>
         <input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(336) 555-0100">
         <div class="hint">We text you when we're on the way.</div>
       </div>
-      <div class="field">
-        <label for="fEmail">Email</label>
-        <input id="fEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@shop.com">
-        <div class="hint">For your receipt copy.</div>
-      </div>
+    </div>
+    <div class="field">
+      <label for="fEmail">Email <span class="req">*</span></label>
+      <input id="fEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@shop.com">
+      <div class="hint">Your receipt copy goes here.</div>
     </div>
     <div class="field">
       <label for="fAddr">Delivery address <span class="req">*</span></label>
       <textarea id="fAddr" autocomplete="street-address" placeholder="Street, suite, city, ZIP"></textarea>
     </div>
     <div class="field">
-      <label for="fNotes">Delivery notes <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+      <label for="fNotes">Delivery notes <span class="req">*</span></label>
       <textarea id="fNotes" placeholder="Best time to drop off, where to leave it, gate code…"></textarea>
+      <div class="hint">Let us know how to find you — a gate code, a buzzer, which door.</div>
     </div>
 
     <button type="button" class="codetoggle" id="codeToggle" aria-expanded="false" aria-controls="codeWrap">Have a discount code?</button>
@@ -984,6 +995,7 @@ async function sendOrderAlert(o, kind){
         order_number: o.code,
         customer: o.name,
         shop: o.shop || "—",
+        license: o.license || "—",
         phone: o.phone,
         email: o.email || "—",
         address: o.addr,
@@ -1357,6 +1369,7 @@ function buildOrder(){
     code: orderCode(),
     placedAt: new Date(),
     name:$("fName").value.trim(), shop:$("fShop").value.trim(),
+    license:$("fLicense").value.trim(),
     phone:$("fPhone").value.trim(), email:$("fEmail").value.trim(),
     addr:$("fAddr").value.trim(), notes:$("fNotes").value.trim(),
     discountCode: (activeCode && t.discount>0) ? activeCode.code : "",
@@ -1401,6 +1414,7 @@ function receiptHTML(o){
       '<div class="sec-label">Delivering to</div>'+
       '<dl class="kv">'+
         '<dt>Name</dt><dd>'+esc(o.name)+(o.shop?" · "+esc(o.shop):"")+'</dd>'+
+        (o.license?'<dt>License</dt><dd>'+esc(o.license)+'</dd>':'')+
         '<dt>Phone</dt><dd>'+esc(o.phone)+'</dd>'+
         (o.email?'<dt>Email</dt><dd>'+esc(o.email)+'</dd>':'')+
         '<dt>Address</dt><dd>'+esc(o.addr).replace(/\n/g,"<br>")+'</dd>'+
@@ -1423,6 +1437,7 @@ function receiptText(o){
   L.push("");
   L.push("CUSTOMER");
   L.push("  "+o.name+(o.shop?" ("+o.shop+")":""));
+  if(o.license) L.push("  License: "+o.license);
   L.push("  "+o.phone+(o.email?" | "+o.email:""));
   L.push("  "+o.addr.replace(/\n/g,", "));
   if(o.notes) L.push("  Notes: "+o.notes);
@@ -1618,15 +1633,51 @@ function applyDiscountCode(){
   $("applyCode").textContent = "Remove";
 }
 
+/* Every box on this form has to be filled in. REQUIRED lists them in the order
+   they appear, so the message reads the way the form reads. */
+const REQUIRED = [
+  ["fName",    "your name"],
+  ["fLicense", "your professional license number"],
+  ["fShop",    "your shop or salon name"],
+  ["fPhone",   "a phone number"],
+  ["fEmail",   "an email address"],
+  ["fAddr",    "a delivery address"],
+  ["fNotes",   "your delivery notes"]
+];
+
+function clearFieldErrors(){
+  REQUIRED.forEach(function(f){ $(f[0]).classList.remove("bad"); });
+}
+/* Taking a run at a field clears its red outline, so the form stops nagging
+   the moment they start fixing it. */
+REQUIRED.forEach(function(f){
+  $(f[0]).addEventListener("input", function(){ this.classList.remove("bad"); });
+});
+
 $("placeOrder").addEventListener("click", function(){
   const err=$("coErr"); err.hidden=true;
+  clearFieldErrors();
+
   const miss=[];
-  if(!$("fName").value.trim()) miss.push("your name");
-  if(!$("fPhone").value.trim()) miss.push("a phone number");
-  if(!$("fAddr").value.trim()) miss.push("a delivery address");
+  REQUIRED.forEach(function(f){
+    if(!$(f[0]).value.trim()){ miss.push(f[1]); $(f[0]).classList.add("bad"); }
+  });
   if(miss.length){
-    err.textContent = "We still need "+miss.join(", ")+" to get this delivered.";
+    const last = miss.pop();
+    err.textContent = "We still need " +
+      (miss.length ? miss.join(", ") + " and " + last : last) +
+      " before we can bring this out.";
     err.hidden=false;
+    $("coSheet").querySelector(".sheet-body").scrollTop=0;
+    const first = REQUIRED.filter(function(f){ return $(f[0]).classList.contains("bad"); })[0];
+    if(first) $(first[0]).focus();
+    return;
+  }
+  // A typo'd email means the receipt bounces, so catch the obvious ones.
+  const email = $("fEmail").value.trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){
+    err.textContent = "That email doesn't look complete — check for a typo so your receipt reaches you.";
+    err.hidden=false; $("fEmail").classList.add("bad"); $("fEmail").focus();
     $("coSheet").querySelector(".sheet-body").scrollTop=0;
     return;
   }
