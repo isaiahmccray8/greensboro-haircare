@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Order professional Influance hair care products with next-day delivery in Greensboro and the Triad.">
 <meta name="theme-color" content="#0B1A2B">
-<title>Triad Beauty Supply Orders</title>
+<title>Greensboro HairCare Orders</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Outfit:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
@@ -382,6 +382,7 @@ footer b{color:var(--text-2)}
   .drow .del,.don{grid-column:span 1}
 }
 .sendpick .note{margin:0}
+#toReceipt:disabled{opacity:.45; cursor:not-allowed}
 .sendbox.sent{background:var(--good-soft); border-color:var(--good)}
 .sendbox.sent h4{color:var(--good)}
 /* payment step */
@@ -690,7 +691,6 @@ p.dim{color:var(--text-3); font-size:13.5px; line-height:1.5}
   <div class="sheet-foot noprint">
     <button class="btn" id="printRcpt">Print or save as PDF</button>
     <button class="btn ghost" id="downloadRcpt" hidden>Download receipt</button>
-    <a class="btn ghost" id="emailOrder" href="#">Email us this order again</a>
     <button class="btn ghost" data-close>Done</button>
   </div>
 </div>
@@ -1832,172 +1832,122 @@ function renderPaySheet(o){
       '</div>';
     }
     h += '<div class="note" style="margin-top:14px"><b>Put <span class="tnum">'+esc(o.code)+'</span> in the payment note</b> so we can match your money to your order.</div>'+
-      '<p class="dim" style="margin-top:14px;text-align:center">Once you\'ve sent it, tap <b>Submit my order</b> below and we\'ll start packing.</p>';
+      '<p class="dim" style="margin-top:14px;text-align:center">Once you\'ve sent it, tap the button below, then text us your order to lock it in.</p>';
   } else {
     h += '<div class="paystep">'+
       '<h4 style="color:var(--good);font-size:15px;margin-bottom:6px">Nothing to pay right now</h4>'+
       '<p>You chose <b>'+esc(o.pay.label)+'</b>, so you\'ll pay <b>'+amt+'</b> when we hand off your order.</p>'+
       '<p class="dim">No deposit, no card on file, no charge before delivery.</p>'+
     '</div>'+
-    '<p class="dim" style="margin-top:14px;text-align:center">Tap <b>Submit my order</b> below and we\'ll get it ready.</p>';
+    '<p class="dim" style="margin-top:14px;text-align:center">Tap the button below, then text us your order to lock it in.</p>';
   }
 
   $("payBody").innerHTML = h;
   $("submitOrder").textContent = o.pay.when === "now"
-    ? "I've sent it — submit my order"
-    : "Submit my order";
+    ? "I've paid — next, text us the order"
+    : "Next — text us the order";
 }
 
 /* ---------- send step (between payment and confirmation) ---------- */
-/* Renders the "how do you want to send this" screen. `state` is
-   "sending" | "auto" (went automatically) | "manual" (customer sends it). */
-function renderSendSheet(o, state){
-  const hasEmail = !!settings.email;
+/* Text-only. The order is NOT placed until the customer opens the text
+   to the shop. The confirm button stays locked until then. */
+let textOpened = false;     // tapped "Send by text message"
+let leftForText = false;    // page went to the background (Messages app opened)
+let unlockTimer = null;
+
+function renderSendSheet(o){
   const hasPhone = !!settings.phone;
+  textOpened = false; leftForText = false;
+  clearTimeout(unlockTimer);
 
-  if(state === "sending"){
-    $("sendBody").innerHTML =
-      '<div class="sendbox"><h4>Sending your order\u2026</h4>'+
-      '<p>One second while we pass this to the shop.</p></div>';
-    $("toReceipt").textContent = "Continue to my receipt";
-    return;
-  }
-
-  if(state === "auto"){
-    $("sendBody").innerHTML =
-      '<div class="sendbox sent"><h4>\u2713 Sent \u2014 the shop has your order</h4>'+
-      '<p>It landed in their inbox just now, so there\u2019s nothing else you need to do. '+
-      'You\u2019ll get a text or call to confirm before delivery.</p></div>'+
-      (hasPhone || hasEmail ?
-        '<p class="dim" style="margin-top:16px;text-align:center">Want to send a copy yourself as well?</p>'+
-        '<div class="sendrow" style="margin-top:10px">'+
-          (hasPhone ? '<a class="btn ghost" id="smsOrder" href="#">Text a copy</a>' : '')+
-          (hasEmail ? '<a class="btn ghost" id="emailOrderInline" href="#">Email a copy</a>' : '')+
-        '</div>' : '');
-    $("toReceipt").textContent = "Continue to my receipt";
-    return;
-  }
-
-  // manual — the customer picks how to send it
   $("sendBody").innerHTML =
-    '<div class="sendbox"><h4>Last step \u2014 send it to the shop</h4>'+
-    '<p>Pick text or email and your full order is already written out for you. '+
-    'All you do is hit send.</p></div>'+
+    '<div class="sendbox" id="sendStatus"><h4>Last step — text your order to the shop</h4>'+
+    '<p>Tap the button below. Your full order is already written into the text — '+
+    'all you do is hit <b>send</b>. Your order isn’t placed until the text is sent.</p></div>'+
     '<div class="sendpick">'+
-      (hasPhone ? '<a class="btn" id="smsOrder" href="#">Send by text message</a>' : '')+
-      (hasEmail ? '<a class="btn '+(hasPhone?'ghost':'')+'" id="emailOrderInline" href="#">Send by email</a>' : '')+
-      (!hasPhone && !hasEmail ?
-        '<div class="note">The shop hasn\u2019t set a phone number or email yet. Use <b>Copy order details</b> below and send it to them however you normally would.</div>' : '')+
-      '<button class="btn ghost" id="copyOrder">Copy order details</button>'+
-    '</div>'+
-    '<p class="dim" style="margin-top:16px;text-align:center">Already sent it? Just tap continue below.</p>';
-  $("toReceipt").textContent = "I've sent it \u2014 show my receipt";
+      (hasPhone
+        ? '<a class="btn" id="smsOrder" href="#">Send by text message</a>'
+        : '<div class="note">The shop hasn’t set a phone number yet, so orders can’t be sent right now. Please call the shop.</div>')+
+    '</div>';
+
+  const btn = $("toReceipt");
+  btn.disabled = true;
+  btn.textContent = "Send the text first";
 }
 
-/* Try the automatic alert, then show the right version of the send step. */
-function runOrderAlert(o){
-  const id = FORMSPREE_ID || settings.formspreeId || "";
-  if(!id){
-    renderSendSheet(o, "manual");
-    wireReceiptLinks(o);
-    return;
+function unlockConfirm(){
+  if(!textOpened) return;
+  clearTimeout(unlockTimer);
+  const box = $("sendStatus");
+  if(box){
+    box.classList.add("sent");
+    box.innerHTML = '<h4>✓ Text opened</h4>'+
+      '<p>Make sure you hit <b>send</b> in Messages, then tap the button below to place your order.</p>';
   }
-  renderSendSheet(o, "sending");
-  sendOrderAlert(o, "NEW ORDER").then(function(sent){
-    renderSendSheet(o, sent ? "auto" : "manual");
-    wireReceiptLinks(o);
-  }).catch(function(){
-    renderSendSheet(o, "manual");
-    wireReceiptLinks(o);
-  });
+  const btn = $("toReceipt");
+  btn.disabled = false;
+  btn.textContent = "I sent the text — place my order";
 }
 
-/* Build the text / email / copy handoffs for a placed order.
-   Safe to call more than once: hrefs refresh, listeners bind only once. */
+/* When they come back from the Messages app, unlock right away. */
+document.addEventListener("visibilitychange", function(){
+  if(!textOpened) return;
+  if(document.hidden) leftForText = true;
+  else if(leftForText) unlockConfirm();
+});
+
+/* Build the text handoff for an order. Listener binds once per button. */
 function wireReceiptLinks(o){
   const text = receiptText(o);
-  const subj = encodeURIComponent("New order "+o.code+" — "+o.name+(o.shop?" ("+o.shop+")":""));
-  const body = encodeURIComponent(text);
-  const mailto = "mailto:"+(settings.email||"")+"?subject="+subj+"&body="+body;
-  const once = function(el){ if(!el || el.dataset.bound) return false; el.dataset.bound="1"; return true; };
-
-  const footEmail = $("emailOrder");
-  if(footEmail){
-    footEmail.href = mailto;
-    footEmail.hidden = !settings.email;   // nowhere to send it without an address
-  }
-  const inlineEmail = $("emailOrderInline");
-  if(inlineEmail) inlineEmail.href = mailto;
-
   const sms = $("smsOrder");
-  if(sms){
-    // sms:NUMBER?&body=… is the form both iOS and Android accept.
-    sms.href = "sms:"+digitsOf(settings.phone)+"?&body="+encodeURIComponent(
-      "New order "+o.code+" from "+o.name+(o.shop?" ("+o.shop+")":"")+"\n"+
-      "Total "+money(o.totals.total)+" · "+o.pay.label+"\n"+
-      o.addr.replace(/\n/g,", ")+"\n\n"+text
-    );
-    if(once(sms)) sms.addEventListener("click", function(){
-      setTimeout(()=>toast("Your texting app should be opening — just hit send."), 400);
-    });
-  }
-
-  if(once(inlineEmail)) inlineEmail.addEventListener("click", function(){
-    setTimeout(()=>toast("Your email app should be opening — just hit send."), 400);
-  });
-
-  const cp = $("copyOrder");
-  if(once(cp)) cp.addEventListener("click", async function(){
-    try{
-      await navigator.clipboard.writeText(text);
-      toast("Order details copied");
-    }catch(err){
-      // Clipboard can be blocked; fall back to selecting the text for the user.
-      const ta=document.createElement("textarea");
-      ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
-      document.body.appendChild(ta); ta.select();
-      try{ document.execCommand("copy"); toast("Order details copied"); }
-      catch(e2){ toast("Press and hold the receipt to copy it"); }
-      document.body.removeChild(ta);
-    }
+  if(!sms) return;
+  // sms:NUMBER?&body=… is the form both iOS and Android accept.
+  sms.href = "sms:"+digitsOf(settings.phone)+"?&body="+encodeURIComponent(
+    "New order "+o.code+" from "+o.name+(o.shop?" ("+o.shop+")":"")+"\n"+
+    "Total "+money(o.totals.total)+" · "+o.pay.label+"\n"+
+    o.addr.replace(/\n/g,", ")+"\n\n"+text
+  );
+  if(sms.dataset.bound) return;
+  sms.dataset.bound = "1";
+  sms.addEventListener("click", function(){
+    textOpened = true;
+    setTimeout(()=>toast("Your texting app should be opening — just hit send."), 400);
+    // Backup for devices where the page never goes to the background.
+    clearTimeout(unlockTimer);
+    unlockTimer = setTimeout(unlockConfirm, 6000);
   });
 }
 
-/* Submit — the single moment the order is confirmed and the shop is told. */
 $("backToCheckout").addEventListener("click", function(){ show("coSheet"); });
 $("backToCheckout2").addEventListener("click", function(){ show("coSheet"); });
 
+/* Payment step -> text step. Nothing is confirmed yet; the cart stays put
+   so closing this screen loses nothing. */
 $("submitOrder").addEventListener("click", function(){
   if(!pendingOrder) return;
-  const btn = $("submitOrder");
-  btn.disabled = true;
-  btn.textContent = "Submitting…";
+  renderSendSheet(pendingOrder);
+  wireReceiptLinks(pendingOrder);
+  show("sendSheet");
+});
 
+/* The single moment the order is placed — only after the text was opened. */
+$("toReceipt").addEventListener("click", function(){
+  if(!pendingOrder || !textOpened){
+    toast("Send your order by text first");
+    return;
+  }
   lastOrder = pendingOrder;
   lastOrder.paidNow = lastOrder.pay.when === "now";
   pendingOrder = null;
+  textOpened = false;
 
   $("rcBody").innerHTML = receiptHTML(lastOrder);
-
   cart = {}; activeCode = null; syncCartUI(); renderList();
   $("fCode").value = ""; $("codeMsg").hidden = true; $("applyCode").textContent = "Apply";
-  show("sendSheet");          // send step first, confirmation after
-  runOrderAlert(lastOrder);
-
-  btn.disabled = false;
-  btn.textContent = "Submit my order";
-});
-
-$("toReceipt").addEventListener("click", function(){
-  if(lastOrder) wireReceiptLinks(lastOrder);
   show("rcSheet");
 });
 
 $("printRcpt").addEventListener("click", function(){ window.print(); });
-
-$("emailOrder").addEventListener("click", function(){
-  setTimeout(()=>toast("Your email app should be opening — just hit send."), 400);
-});
 
 /* downloads capability (optional) */
 let dlCap=null;
