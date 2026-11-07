@@ -1390,7 +1390,7 @@ function payOptions(){
     desc:"Send through Apple Cash in Messages to "+settings.applepay+", or just tap your phone to ours at the door."});
   if(settings.zelle) opts.push({id:"zelle", label:"Zelle", when:"now", handle:settings.zelle,
     desc:"Send to "+settings.zelle+" from your bank app. We'll confirm it before we load the van."});
-  if(settings.acceptCash) opts.push({id:"cash", label:"Cash or card on delivery", when:"later",
+  if(settings.acceptCash) opts.push({id:"cash", label:"Payment on delivery", when:"later",
     desc:"Pay the driver when your order arrives. Exact change appreciated but not required."});
   if(!opts.length) opts.push({id:"cash", label:"Pay on delivery", when:"later", desc:"Pay when your order arrives."});
   return opts;
