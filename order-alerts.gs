@@ -65,7 +65,11 @@ function cleanPromos(p) {
     on: !!a.on, pct: Math.min(100, Math.max(0, Number(a.pct) || 0)),
     label: String(a.label || "Weekend special").slice(0, 60),
     startDay: day(a.startDay, 6), startTime: cleanTime(a.startTime, "17:00"),
-    endDay: day(a.endDay, 2), endTime: cleanTime(a.endTime, "12:00"), stack: !!a.stack
+    endDay: day(a.endDay, 2), endTime: cleanTime(a.endTime, "12:00"), stack: !!a.stack,
+    // The specific date ranges the discount runs (e.g. Sat 5 PM -> Tue noon).
+    windows: (Array.isArray(a.windows) ? a.windows : []).slice(0, 120).map(function (w) {
+      return { start: cleanStamp(w && w.start), end: cleanStamp(w && w.end) };
+    }).filter(function (w) { return w.start && w.end && w.end > w.start; })
   };
   return { discounts: discounts, autoDiscount: autoDiscount };
 }
