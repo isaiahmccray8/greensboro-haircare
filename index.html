@@ -383,6 +383,10 @@ footer b{color:var(--text-2)}
   letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--line)}
 .don{display:grid; place-items:center}
 .don input{width:18px; height:18px; accent-color:var(--accent)}
+.dwin{display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:-4px 0 12px}
+.dwin label{font-size:11px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em}
+.dwin input{width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:6px; font-size:13.5px; background:var(--surface); color:var(--text)}
+.dwin .dstat{grid-column:1/-1; font-size:12px; color:var(--text-2)}
 .dnote{width:100%; padding:7px 9px; border:1px dashed var(--line); border-radius:6px; font-size:12.5px;
   background:transparent; color:var(--text-2); margin-bottom:10px}
 @media (max-width:520px){
@@ -930,7 +934,7 @@ const DEFAULT_SETTINGS = {
   paypal:"",
   venmo:"",
   acceptCash:true,
-  adminPin:"Artis",
+  adminPin:"",   // owner password now lives in the Google script (ADMIN_PASSWORD)
 
   /* The catalogs are built into this file. Turn this on only if you ALSO
      upload the /catalogs folder and want a full-resolution PDF download. */
@@ -1051,6 +1055,32 @@ async function sendOrderAlert(o){
   }finally{
     if(timer) clearTimeout(timer);
   }
+}
+
+/* ---------------- live discounts (shared by every customer) ----------------
+   Discount codes and the scheduled discount are stored in the Google
+   script, so what the owner saves in Owner tools reaches every visitor. */
+let adminPassword = "";   // held in memory only while Owner tools are unlocked
+
+async function callBackend(payload){
+  const res = await fetch(ORDER_ENDPOINT, {method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+  return await res.json();
+}
+function applyPromos(data){
+  if(!data || !data.ok) return;
+  if(Array.isArray(data.discounts)) settings.discounts = data.discounts;
+  if(data.autoDiscount && typeof data.autoDiscount === "object") settings.autoDiscount = data.autoDiscount;
+}
+async function loadLivePromos(){
+  if(!ORDER_ENDPOINT) return;
+  try{
+    const res = await fetch(ORDER_ENDPOINT + "?action=promos");
+    applyPromos(await res.json());
+    renderPromo();
+    if(openSheet === "cartSheet") renderCart();
+    if(openSheet === "coSheet"){ if(activeCode) applyDiscountCode(); refreshCoTotals(); }
+  }catch(e){ /* offline — the codes built into this file still work */ }
 }
 
 /* ---------------- state ---------------- */
@@ -1280,7 +1310,7 @@ function computeTotals(){
 
   // Discount comes off the subtotal, so tax is charged on what's actually paid.
   let codeDisc = 0;
-  if(activeCode && subtotal >= (activeCode.min||0)){
+  if(activeCode && subtotal >= (activeCode.min||0) && codeTiming(activeCode) === "live"){
     codeDisc = activeCode.type === "pct"
       ? Math.round(subtotal * activeCode.value) / 100
       : Math.min(activeCode.value, subtotal);
@@ -1314,7 +1344,36 @@ function computeTotals(){
           tax:tax, rate:rate, delivery:delivery, total:total};
 }
 
-/* Find a usable code. Returns the matching rule or null. */
+/* Current Greensboro date-time as "YYYY-MM-DDTHH:MM", so it compares
+   directly against the start/end a code was given in Owner tools. */
+function shopStamp(){
+  const d = new Date();
+  try{
+    const parts = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York", year:"numeric", month:"2-digit",
+      day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(d);
+    const g = t => (parts.filter(p=>p.type===t)[0]||{}).value;
+    return g("year")+"-"+g("month")+"-"+g("day")+"T"+String(Number(g("hour"))%24).padStart(2,"0")+":"+g("minute");
+  }catch(e){
+    const p=n=>String(n).padStart(2,"0");
+    return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+  }
+}
+function stampLabel(st){
+  if(!st) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(st); if(!m) return st;
+  const dt = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+  return dt.toLocaleDateString("en-US",{weekday:"short", month:"short", day:"numeric"})+" at "+timeLabel(m[4]+":"+m[5]);
+}
+/* "live", "early" (not started yet) or "ended" for a code's date window. */
+function codeTiming(d){
+  const now = shopStamp();
+  if(d.start && now < d.start) return "early";
+  if(d.end && now >= d.end) return "ended";
+  return "live";
+}
+
+/* Find a code. Returns the matching rule (even if outside its dates, so the
+   customer can be told when it works) or null. */
 function lookupCode(raw){
   const want = String(raw||"").trim().toUpperCase().replace(/\s+/g,"");
   if(!want) return null;
@@ -1390,7 +1449,7 @@ function payOptions(){
     desc:"Send through Apple Cash in Messages to "+settings.applepay+", or just tap your phone to ours at the door."});
   if(settings.zelle) opts.push({id:"zelle", label:"Zelle", when:"now", handle:settings.zelle,
     desc:"Send to "+settings.zelle+" from your bank app. We'll confirm it before we load the van."});
-  if(settings.acceptCash) opts.push({id:"cash", label:"Payment on delivery", when:"later",
+  if(settings.acceptCash) opts.push({id:"cash", label:"Cash or card on delivery", when:"later",
     desc:"Pay the driver when your order arrives. Exact change appreciated but not required."});
   if(!opts.length) opts.push({id:"cash", label:"Pay on delivery", when:"later", desc:"Pay when your order arrives."});
   return opts;
@@ -1714,6 +1773,15 @@ function applyDiscountCode(){
     activeCode = null;
     msg.className = "codemsg bad"; msg.hidden = false;
     msg.textContent = "We don't recognize that code. Double-check the spelling, or leave it blank.";
+    $("applyCode").textContent = "Apply"; refreshCoTotals(); return;
+  }
+  const timing = codeTiming(rule);
+  if(timing !== "live"){
+    activeCode = null;
+    msg.className = "codemsg warn"; msg.hidden = false;
+    msg.textContent = timing === "early"
+      ? rule.code + " starts " + stampLabel(rule.start) + ". Come back then and it will work."
+      : rule.code + " ended " + stampLabel(rule.end) + ".";
     $("applyCode").textContent = "Apply"; refreshCoTotals(); return;
   }
   if(sub < (rule.min||0)){
@@ -2105,11 +2173,21 @@ document.addEventListener("click", function(e){ if(e.target.closest("[data-close
 document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeAll(); });
 
 /* ---------------- admin ---------------- */
-$("adminBtn").addEventListener("click", function(){
+$("adminBtn").addEventListener("click", async function(){
   if(!adminUnlocked){
     const pin = prompt("Owner password");
     if(pin===null) return;
-    if(pin !== String(settings.adminPin)){ toast("That PIN didn't match"); return; }
+    if(ORDER_ENDPOINT){
+      toast("Checking\u2026");
+      try{
+        const r = await callBackend({action:"login", password:pin});
+        if(!r || !r.ok){ toast(r && r.error ? r.error : "That password didn't match"); return; }
+        adminPassword = pin;
+        applyPromos(r);          // full list, including codes that are switched off
+      }catch(e){ toast("Can't reach the server \u2014 check your connection"); return; }
+    } else {
+      if(!settings.adminPin || pin !== String(settings.adminPin)){ toast("That password didn't match"); return; }
+    }
     adminUnlocked = true;
   }
   renderAdmin("store");
@@ -2143,7 +2221,8 @@ function renderAdmin(tab){
       afield("sFree","Free delivery over ($, 0 = always free)",s.freeOver,"number")+'</div>'+
       '<div class="two">'+
       afield("sMin","Minimum order ($, 0 = none)",s.minOrder,"number")+
-      afield("sPin","Owner password for this panel",s.adminPin)+'</div>'+
+      (ORDER_ENDPOINT ? '<div class="field"><label>Owner password</label><div class="dim" style="font-size:13px;padding-top:8px">Set in the Google script (ADMIN_PASSWORD).</div></div>'
+                      : afield("sPin","Owner password for this panel",s.adminPin))+'</div>'+
       '<label class="checkline" for="sPdfs"><input type="checkbox" id="sPdfs"'+(s.catalogPdfs?" checked":"")+'>'+
       '<span><b>I also uploaded the /catalogs folder</b><span>Leave this off unless you put that folder on your site too. '+
       'The catalogs already work without it \u2014 switching this on just adds a full-resolution PDF download button in the viewer.</span></span></label>';
@@ -2185,7 +2264,7 @@ function renderAdmin(tab){
     h += '<div class="note" style="margin-bottom:14px"><b>Codes customers can type at checkout.</b> '+
       'Percent takes that much off the subtotal; Dollars takes a flat amount off. '+
       '<b>Min</b> is the subtotal they have to reach \u2014 set it to 0 for any order. '+
-      'Untick <b>On</b> to retire a code without deleting it. Tax is charged on the discounted amount, which is how NC expects it.</div>'+
+      'Untick <b>On</b> to retire a code without deleting it. Give a code <b>dates</b> and it only works between them (Greensboro time). Tax is charged on the discounted amount, which is how NC expects it.</div>'+
       '<div class="dhead"><span>Code</span><span>Type</span><span>Value</span><span>Min $</span><span>On</span><span></span></div>'+
       '<div id="drows">'+ list.map(function(d,i){
         return '<div class="drow" data-i="'+i+'">'+
@@ -2199,12 +2278,21 @@ function renderAdmin(tab){
           '<label class="don"><input type="checkbox" data-f="on"'+(d.on!==false?" checked":"")+' aria-label="Enabled"></label>'+
           '<button class="del" data-ddel="'+i+'" aria-label="Delete code">\u2715</button>'+
         '</div>'+
-        '<input class="dnote" value="'+esc(d.note||"")+'" data-f="note" placeholder="What this code is for (only you see this)" aria-label="Note">';
+        '<input class="dnote" value="'+esc(d.note||"")+'" data-f="note" placeholder="What this code is for (only you see this)" aria-label="Note">'+
+        '<div class="dwin" data-i="'+i+'">'+
+          '<div><label>Works from (optional)</label><input type="datetime-local" data-f="start" value="'+esc(d.start||"")+'"></div>'+
+          '<div><label>Until (optional)</label><input type="datetime-local" data-f="end" value="'+esc(d.end||"")+'"></div>'+
+          '<div class="dstat">'+(d.on===false ? "Switched off" :
+            ({live:"\u2705 Working now", early:"\u23f3 Starts "+esc(stampLabel(d.start)), ended:"Ended "+esc(stampLabel(d.end))})[codeTiming(d)])+
+            (d.start||d.end ? "" : " \u00b7 no dates = works any time")+'</div>'+
+        '</div>';
       }).join("")+'</div>'+
       '<button class="btn ghost" id="addCode" style="margin-top:14px">Add a code</button>'+
-      '<div class="note" style="margin-top:14px;border-left-color:var(--warn);background:var(--warn-soft)">'+
-      '<b>Same rule as the other tabs:</b> changes here save in this browser only. '+
-      'Send me the codes you want live for customers and I\u2019ll build them into the file.</div>';
+      (ORDER_ENDPOINT
+        ? '<div class="note" style="margin-top:14px;border-left-color:var(--good);background:var(--good-soft)">'+
+          '<b>Live for everyone:</b> tap <b>Save changes</b> and these codes and the scheduled discount work for every customer on every device right away.</div>'
+        : '<div class="note" style="margin-top:14px;border-left-color:var(--warn);background:var(--warn-soft)">'+
+          '<b>Same rule as the other tabs:</b> changes here save in this browser only.</div>');
   }
 
   if(tab==="products"){
@@ -2231,7 +2319,8 @@ function afield(id,label,val,type){
 
 $("adBody").addEventListener("click", function(e){
   const tb=e.target.closest(".tab");
-  if(tb){ collectAdmin(); renderAdmin(tb.dataset.tab); return; }
+  if(tb){ if($("adBody").dataset.tab==="discounts") $("adSave").dataset.promosDirty="1";
+          collectAdmin(); renderAdmin(tb.dataset.tab); return; }
   if(e.target.id==="addProd"){
     collectAdmin();
     catalog.push({id:"c"+Date.now(), name:"New product", cat:activeCat==="All"?"Go Natural":activeCat, size:"8 oz", price:0, desc:""});
@@ -2278,7 +2367,7 @@ function collectAdmin(){
     settings.deliveryFee=Number(v("sDel"))||0;
     settings.freeOver=Number(v("sFree"))||0;
     settings.minOrder=Number(v("sMin"))||0;
-    settings.adminPin=v("sPin")||"Artis";
+    if($("sPin")) settings.adminPin=v("sPin")||settings.adminPin;
     settings.catalogPdfs=$("sPdfs")?$("sPdfs").checked:false;
   }
   if(tab==="payments"){
@@ -2295,10 +2384,13 @@ function collectAdmin(){
     rows.forEach(function(r){
       const g=f=>r.querySelector('[data-f="'+f+'"]');
       const note=r.nextElementSibling && r.nextElementSibling.classList.contains("dnote") ? r.nextElementSibling.value : "";
-      const code=g("code").value.trim().toUpperCase().replace(/\s+/g,"");
+      const code=g("code").value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");
       if(!code) return;
+      const win=document.querySelector('#drows .dwin[data-i="'+r.dataset.i+'"]');
+      const ws=f=>{ const el=win && win.querySelector('[data-f="'+f+'"]'); return el ? el.value.slice(0,16) : ""; };
       out.push({code:code, type:g("type").value, value:Number(g("value").value)||0,
-                min:Number(g("min").value)||0, on:g("on").checked, note:note});
+                min:Number(g("min").value)||0, on:g("on").checked, note:note,
+                start:ws("start"), end:ws("end")});
     });
     settings.discounts = out;
     settings.discountsEdited = true;
@@ -2326,8 +2418,9 @@ function collectAdmin(){
   }
 }
 
-$("adSave").addEventListener("click", function(){
+$("adSave").addEventListener("click", async function(){
   collectAdmin();
+  const promosChanged = $("adBody").dataset.tab === "discounts" || this.dataset.promosDirty === "1";
   saveJSON(LS_SET,settings);
   saveJSON(LS_CAT,{v:CATALOG_VERSION, items:catalog.map(function(p){
     const base = BASE_CATALOG.filter(b=>b.id===p.id)[0];
@@ -2335,6 +2428,18 @@ $("adSave").addEventListener("click", function(){
     return Object.assign({}, p, {edited:changed});
   })});
   applySettings(); renderChips(); renderList(); renderPromo();
+  if(ORDER_ENDPOINT && adminPassword && promosChanged){
+    const btn = this; btn.disabled = true; btn.textContent = "Saving to the live site\u2026";
+    try{
+      const r = await callBackend({action:"savePromos", password:adminPassword,
+                                   discounts:settings.discounts, autoDiscount:settings.autoDiscount});
+      if(r && r.ok){ applyPromos(r); btn.dataset.promosDirty = ""; renderAdmin("discounts"); renderPromo();
+                     toast("Saved \u2014 live for every customer now"); }
+      else toast("Not saved to the live site: " + ((r && r.error) || "unknown error"));
+    }catch(e){ toast("Couldn't reach the server \u2014 discounts not saved for customers yet"); }
+    btn.disabled = false; btn.textContent = "Save changes";
+    return;
+  }
   toast("Saved on this device");
 });
 
@@ -2365,6 +2470,7 @@ try{
   renderList();
   syncCartUI();
   renderPromo();
+  loadLivePromos();
   // Keep the banner (and any open totals) right as the window opens or closes.
   setInterval(function(){
     renderPromo();
