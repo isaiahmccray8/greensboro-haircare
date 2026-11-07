@@ -24,6 +24,10 @@
    6. Open index.html, find   const ORDER_ENDPOINT = "";
       and paste the URL between the quotes. Re-upload the site.
 
+   DISCOUNTS: codes and the scheduled discount you save in the site's
+   Owner tools are stored here (Project Settings -> Script Properties),
+   so every customer gets them. The Owner tools password is ADMIN_PASSWORD.
+
    If you edit this script later: Deploy -> Manage deployments -> pencil ->
    Version: New version -> Deploy. (The URL stays the same.)
    ===================================================================== */
@@ -33,12 +37,78 @@ const CONFIG = {
   OWNER_PHONE: "3363145959",               // where order texts go (10 digits, comma-separate for more)
   TEXTBELT_KEY: "",                        // paste your Textbelt key here
   SEND_CUSTOMER_COPY: true,                // email the customer their receipt too
-  STORE_NAME: "Greensboro Haircare"
+  STORE_NAME: "Greensboro Haircare",
+  ADMIN_PASSWORD: "Artis"                  // the password for the ⚙ Owner tools on the site — change it to your own
 };
+
+/* ---------- discounts shared with every customer ---------- */
+function loadPromos() {
+  const raw = PropertiesService.getScriptProperties().getProperty("PROMOS");
+  try { return raw ? JSON.parse(raw) : null; } catch (err) { return null; }
+}
+function cleanStamp(v) { v = String(v || "").slice(0, 16); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? v : ""; }
+function cleanTime(v, fb) { v = String(v || ""); return /^\d{2}:\d{2}$/.test(v) ? v : fb; }
+function cleanPromos(p) {
+  const discounts = (Array.isArray(p.discounts) ? p.discounts : []).slice(0, 100).map(function (d) {
+    const type = d.type === "amt" ? "amt" : "pct";
+    let value = Math.max(0, Number(d.value) || 0);
+    if (type === "pct") value = Math.min(100, value);
+    return {
+      code: String(d.code || "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 30),
+      type: type, value: value, min: Math.max(0, Number(d.min) || 0), on: d.on !== false,
+      note: String(d.note || "").slice(0, 200), start: cleanStamp(d.start), end: cleanStamp(d.end)
+    };
+  }).filter(function (d) { return d.code; });
+  const a = p.autoDiscount || {};
+  const day = function (v, fb) { v = Number(v); return v >= 0 && v <= 6 ? Math.floor(v) : fb; };
+  const autoDiscount = {
+    on: !!a.on, pct: Math.min(100, Math.max(0, Number(a.pct) || 0)),
+    label: String(a.label || "Weekend special").slice(0, 60),
+    startDay: day(a.startDay, 6), startTime: cleanTime(a.startTime, "17:00"),
+    endDay: day(a.endDay, 2), endTime: cleanTime(a.endTime, "12:00"), stack: !!a.stack
+  };
+  return { discounts: discounts, autoDiscount: autoDiscount };
+}
+/* What customers get: only codes that are switched on, without your notes. */
+function publicPromos(p) {
+  if (!p) return { ok: true };
+  return {
+    ok: true,
+    discounts: p.discounts.filter(function (d) { return d.on; })
+      .map(function (d) { return { code: d.code, type: d.type, value: d.value, min: d.min, on: true, start: d.start, end: d.end }; }),
+    autoDiscount: p.autoDiscount
+  };
+}
+function checkPassword(pw) {
+  if (!CONFIG.ADMIN_PASSWORD) return "Set ADMIN_PASSWORD in the Google script first";
+  // Slow down password guessing: max 10 wrong tries per 10 minutes.
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get("pwfails") || 0);
+  if (fails >= 10) return "Too many wrong tries — wait 10 minutes";
+  if (String(pw) !== String(CONFIG.ADMIN_PASSWORD)) { cache.put("pwfails", String(fails + 1), 600); return "That password didn't match"; }
+  return "";
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === "promos") return reply(publicPromos(loadPromos()));
+  return reply({ ok: true, service: "order alerts" });
+}
 
 function doPost(e) {
   try {
     const o = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+
+    if (o.action === "login" || o.action === "savePromos") {
+      const bad = checkPassword(o.password);
+      if (bad) return reply({ ok: false, error: bad });
+      if (o.action === "savePromos") {
+        const clean = cleanPromos(o);
+        PropertiesService.getScriptProperties().setProperty("PROMOS", JSON.stringify(clean));
+        return reply({ ok: true, discounts: clean.discounts, autoDiscount: clean.autoDiscount });
+      }
+      const p = loadPromos();
+      return reply(p ? { ok: true, discounts: p.discounts, autoDiscount: p.autoDiscount } : { ok: true });
+    }
 
     // Ignore anything that isn't a real order from the site.
     if (!o.order_number || !/^ORD-\d{8}-\d{4}$/.test(o.order_number) || !Array.isArray(o.items) || !o.items.length) {
