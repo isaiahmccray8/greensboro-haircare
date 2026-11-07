@@ -35,7 +35,7 @@
 const CONFIG = {
   OWNER_EMAIL: "greensborohaircarewarehouse@gmail.com",   // where order emails go (comma-separate for more than one)
   OWNER_PHONE: "3363145959",               // where order texts go (10 digits, comma-separate for more)
-  TEXTBELT_KEY: "",                        // paste your Textbelt key here
+  TEXTBELT_KEY: "6b22f9879b8c95659c3eb44fabb0b770ad64acd9cng1yzhv0XeN1Qzb3ycrgwQLM",                        // paste your Textbelt key here
   SEND_CUSTOMER_COPY: true,                // email the customer their receipt too
   STORE_NAME: "Greensboro Haircare",
   ADMIN_PASSWORD: "Artis"                  // the password for the ⚙ Owner tools on the site — change it to your own
@@ -65,11 +65,7 @@ function cleanPromos(p) {
     on: !!a.on, pct: Math.min(100, Math.max(0, Number(a.pct) || 0)),
     label: String(a.label || "Weekend special").slice(0, 60),
     startDay: day(a.startDay, 6), startTime: cleanTime(a.startTime, "17:00"),
-    endDay: day(a.endDay, 2), endTime: cleanTime(a.endTime, "12:00"), stack: !!a.stack,
-    // The specific date ranges the discount runs (e.g. Sat 5 PM -> Tue noon).
-    windows: (Array.isArray(a.windows) ? a.windows : []).slice(0, 120).map(function (w) {
-      return { start: cleanStamp(w && w.start), end: cleanStamp(w && w.end) };
-    }).filter(function (w) { return w.start && w.end && w.end > w.start; })
+    endDay: day(a.endDay, 2), endTime: cleanTime(a.endTime, "12:00"), stack: !!a.stack
   };
   return { discounts: discounts, autoDiscount: autoDiscount };
 }
