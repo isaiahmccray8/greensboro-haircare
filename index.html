@@ -952,14 +952,19 @@ const DEFAULT_SETTINGS = {
   ],
   discountsEdited:false,
 
-  /* Scheduled discount — comes off automatically, no code needed.
-     Days: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat. Times are 24-hour,
-     always Greensboro (Eastern) time no matter where the customer is.
-     Default: 10% off from Saturday 5:00 PM until Tuesday 12:00 noon.
-     `stack:false` means a customer gets whichever is bigger — this or
-     their code — not both. */
-  autoDiscount:{on:true, pct:10, startDay:6, startTime:"17:00", endDay:2, endTime:"12:00",
-                label:"Weekend special", stack:false},
+  /* Scheduled discount — comes off automatically, no code needed, and the
+     banner only shows while one of these date windows is open. Times are
+     Greensboro (Eastern) time no matter where the customer is.
+     Set the dates in Owner tools → Discount codes; what's saved there
+     (in the Google script) replaces this list for every customer.
+     `stack:false` = customer gets this OR their code, whichever is bigger. */
+  autoDiscount:{on:true, pct:10, label:"Weekend special", stack:false,
+                windows:[
+                  {start:"2026-11-07T17:00", end:"2026-11-10T12:00"},
+                  {start:"2026-11-14T17:00", end:"2026-11-17T12:00"},
+                  {start:"2026-11-21T17:00", end:"2026-11-24T12:00"},
+                  {start:"2026-11-28T17:00", end:"2026-12-01T12:00"}
+                ]},
 
   /* Catalog PDFs sitting next to index.html on your site. */
   catalogs:[
@@ -1283,6 +1288,13 @@ function timeLabel(t){
 function autoWindow(){
   const a = settings.autoDiscount;
   if(!a || !a.on || !(Number(a.pct) > 0)) return null;
+  if(Array.isArray(a.windows)){
+    // Only on the dates the owner picked.
+    const now = shopStamp();
+    const w = a.windows.filter(x => x && x.start && x.end && now >= x.start && now < x.end)[0];
+    return {live:!!w, pct:Number(a.pct), label:a.label || "Weekend special", stack:!!a.stack,
+            endText: w ? stampLabel(w.end) : ""};
+  }
   const start = Number(a.startDay)*1440 + hm(a.startTime);
   const end   = Number(a.endDay)*1440 + hm(a.endTime);
   const n = shopNow(), now = n.day*1440 + n.minutes;
@@ -1294,7 +1306,8 @@ function autoWindow(){
 function renderPromo(){
   const el = $("promoBanner"); if(!el) return;
   const w = autoWindow();
-  if(!w){ el.hidden = true; return; }
+  // Only show the banner while the discount is actually running.
+  if(!w || !w.live){ el.hidden = true; return; }
   el.hidden = false;
   el.className = "promo " + (w.live ? "live" : "soon");
   el.innerHTML = '<span class="pct">'+w.pct+'%</span><div>'+
@@ -2246,17 +2259,28 @@ function renderAdmin(tab){
     const list = settings.discounts || [];
     const a = settings.autoDiscount || {};
     const dayOpts = sel => DAY_NAMES.map((n,i)=>'<option value="'+i+'"'+(Number(sel)===i?" selected":"")+'>'+n+'</option>').join("");
+    const wins = Array.isArray(a.windows) ? a.windows : [];
+    const nowSt = shopStamp();
+    const thisMonth = nowSt.slice(0,7);
     h += '<div class="sec-label" style="margin-top:0">Scheduled discount (automatic, no code)</div>'+
       '<label class="checkline" for="aOn"><input type="checkbox" id="aOn"'+(a.on?" checked":"")+'>'+
-      '<span><b>Turn on the scheduled discount</b><span>Comes off every order placed inside the window below, Greensboro time.</span></span></label>'+
+      '<span><b>Scheduled discount is ON</b><span>Untick to switch it off everywhere right away. Your dates stay saved for when you turn it back on.</span></span></label>'+
       '<div class="two">'+afield("aLabel","Name customers see",a.label||"Weekend special")+afield("aPct","Percent off",a.pct,"number")+'</div>'+
-      '<div class="two">'+
-        '<div class="field"><label for="aSDay">Starts</label><select id="aSDay">'+dayOpts(a.startDay)+'</select></div>'+
-        '<div class="field"><label for="aSTime">at</label><input id="aSTime" type="time" value="'+esc(a.startTime||"17:00")+'"></div>'+
-      '</div>'+
-      '<div class="two">'+
-        '<div class="field"><label for="aEDay">Ends</label><select id="aEDay">'+dayOpts(a.endDay)+'</select></div>'+
-        '<div class="field"><label for="aETime">at</label><input id="aETime" type="time" value="'+esc(a.endTime||"12:00")+'"></div>'+
+      '<div class="note" style="margin:0 0 10px">It only comes off — and the banner only shows — between the dates below (Greensboro time).</div>'+
+      '<div id="awins">'+ (wins.length ? wins.map(function(w,i){
+        const st = (w.start && nowSt < w.start) ? "⏳ Coming up" : (w.end && nowSt >= w.end) ? "Ended" : "✅ Running now";
+        return '<div class="dwin awin" data-i="'+i+'">'+
+          '<div><label>From</label><input type="datetime-local" data-f="start" value="'+esc(w.start||"")+'"></div>'+
+          '<div><label>Until</label><input type="datetime-local" data-f="end" value="'+esc(w.end||"")+'"></div>'+
+          '<div class="dstat">'+st+' · <a href="#" data-wdel="'+i+'">remove</a></div>'+
+        '</div>';
+      }).join("") : '<div class="dim" style="margin:6px 0 12px">No dates yet — add some below.</div>')+'</div>'+
+      '<div class="field"><label for="aMonth">Add every Saturday 5 PM → Tuesday noon in</label>'+
+        '<div class="discountrow"><input id="aMonth" type="month" value="'+thisMonth+'">'+
+        '<button type="button" class="btn" id="addWeekends">Add weekends</button></div></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+        '<button type="button" class="btn ghost" id="addWin" style="width:auto">Add one date range</button>'+
+        '<button type="button" class="btn ghost" id="clearEnded" style="width:auto">Remove ended dates</button>'+
       '</div>'+
       '<label class="checkline" for="aStack"><input type="checkbox" id="aStack"'+(a.stack?" checked":"")+'>'+
       '<span><b>Let codes stack on top</b><span>Off: the customer gets whichever saves more. On: both come off.</span></span></label>'+
@@ -2328,6 +2352,52 @@ $("adBody").addEventListener("click", function(e){
     $("adBody").querySelector(".sheet-body,#arows")?.scrollIntoView({block:"end"});
     return;
   }
+  if(e.target.id==="addWeekends"){
+    collectAdmin();
+    const m = /^(\d{4})-(\d{2})$/.exec($("aMonth") ? $("aMonth").value : "");
+    if(!m){ toast("Pick a month first"); return; }
+    const y = Number(m[1]), mo = Number(m[2]) - 1;
+    const p = n => String(n).padStart(2,"0");
+    const ad = settings.autoDiscount;
+    ad.windows = Array.isArray(ad.windows) ? ad.windows : [];
+    let added = 0;
+    for(let d = 1; d <= 31; d++){
+      const dt = new Date(y, mo, d);
+      if(dt.getMonth() !== mo) break;
+      if(dt.getDay() !== 6) continue;
+      const tue = new Date(y, mo, d + 3);
+      const w = {start: y+"-"+p(mo+1)+"-"+p(d)+"T17:00",
+                 end: tue.getFullYear()+"-"+p(tue.getMonth()+1)+"-"+p(tue.getDate())+"T12:00"};
+      if(!ad.windows.some(x => x.start === w.start)){ ad.windows.push(w); added++; }
+    }
+    ad.windows.sort((a,b) => a.start < b.start ? -1 : 1);
+    renderAdmin("discounts");
+    toast(added ? "Added "+added+" weekends \u2014 tap Save changes" : "Those weekends are already on the list");
+    return;
+  }
+  if(e.target.id==="addWin"){
+    collectAdmin();
+    const ad = settings.autoDiscount;
+    ad.windows = (Array.isArray(ad.windows) ? ad.windows : []).concat([{start:"", end:""}]);
+    renderAdmin("discounts");
+    return;
+  }
+  if(e.target.id==="clearEnded"){
+    collectAdmin();
+    const now = shopStamp();
+    settings.autoDiscount.windows = (settings.autoDiscount.windows||[]).filter(w => w.end > now);
+    renderAdmin("discounts");
+    toast("Ended dates removed \u2014 tap Save changes");
+    return;
+  }
+  const wdel = e.target.closest("[data-wdel]");
+  if(wdel){
+    e.preventDefault();
+    collectAdmin();
+    settings.autoDiscount.windows.splice(Number(wdel.dataset.wdel), 1);
+    renderAdmin("discounts");
+    return;
+  }
   if(e.target.id==="addCode"){
     collectAdmin();
     settings.discounts = (settings.discounts||[]).concat([{code:"NEWCODE", type:"pct", value:10, min:0, on:true, note:""}]);
@@ -2395,13 +2465,17 @@ function collectAdmin(){
     settings.discounts = out;
     settings.discountsEdited = true;
     if($("aOn")){
+      const windows = [...document.querySelectorAll("#awins .awin")].map(function(w){
+        const g=f=>(w.querySelector('[data-f="'+f+'"]').value||"").slice(0,16);
+        return {start:g("start"), end:g("end")};
+      }).filter(w => w.start && w.end && w.end > w.start)
+        .sort((x,y) => x.start < y.start ? -1 : 1);
       settings.autoDiscount = {
         on: $("aOn").checked,
         label: (v("aLabel")||"").trim() || "Weekend special",
         pct: Math.max(0, Math.min(100, Number(v("aPct"))||0)),
-        startDay: Number(v("aSDay"))||0, startTime: v("aSTime")||"17:00",
-        endDay: Number(v("aEDay"))||0,   endTime: v("aETime")||"12:00",
-        stack: $("aStack").checked
+        stack: $("aStack").checked,
+        windows: windows
       };
     }
   }
